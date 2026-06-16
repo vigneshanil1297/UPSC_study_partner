@@ -70,6 +70,7 @@ export default function Home() {
   const [history, setHistory] = useState<EvalRecord[]>([]);
   const [user, setUser] = useState<{ email: string } | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   // Track the Google sign-in session. When Supabase isn't configured, skip auth
   // entirely (local dev fallback) so the app still runs.
@@ -88,10 +89,28 @@ export default function Home() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Load history once a user is signed in (rows are scoped to them by RLS).
+  // Once signed in, confirm the email is on the server allowlist (via /api/me,
+  // so the list never reaches the browser). Only then load history.
   useEffect(() => {
-    if (historyEnabled && user) refreshHistory();
-    else setHistory([]);
+    if (!historyEnabled || !user) {
+      setAuthorized(null);
+      setHistory([]);
+      return;
+    }
+    let cancelled = false;
+    getAccessToken()
+      .then((token) =>
+        fetch("/api/me", { headers: { Authorization: `Bearer ${token ?? ""}` } }),
+      )
+      .then((res) => {
+        if (cancelled) return;
+        setAuthorized(res.ok);
+        if (res.ok) refreshHistory();
+      })
+      .catch(() => !cancelled && setAuthorized(false));
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   async function refreshHistory() {
@@ -185,6 +204,30 @@ export default function Home() {
         >
           Sign in with Google
         </button>
+      </main>
+    );
+  }
+
+  // Signed in but allowlist check pending / failed.
+  if (historyEnabled && user && authorized !== true) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-5 text-center">
+        {authorized === null ? (
+          <p className="text-sm text-neutral-500">Checking access…</p>
+        ) : (
+          <>
+            <h1 className="text-2xl font-bold">Access denied</h1>
+            <p className="mt-2 text-sm text-neutral-600">
+              <span className="font-medium">{user.email}</span> is not authorized to use this app.
+            </p>
+            <button
+              onClick={() => signOut()}
+              className="mt-6 rounded-md border border-neutral-300 bg-white px-5 py-2.5 text-sm font-medium hover:bg-neutral-50"
+            >
+              Sign out
+            </button>
+          </>
+        )}
       </main>
     );
   }
