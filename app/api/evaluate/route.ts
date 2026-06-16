@@ -4,6 +4,7 @@ import { getGenAI, MODEL } from "@/lib/gemini";
 import { CRITERIA, EvaluationSchema, type EvalMode } from "@/lib/criteria";
 import { evaluationSystem, evaluationUser } from "@/lib/prompts";
 import { loadExemplars } from "@/lib/exemplars";
+import { requireUser } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -39,6 +40,9 @@ const RESPONSE_SCHEMA = {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!(await requireUser(req))) {
+      return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+    }
     const { topic, essay, mode } = (await req.json()) as {
       topic?: string;
       essay?: string;
@@ -49,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
     const evalMode: EvalMode = mode === "gs" ? "gs" : "essay";
 
-    const exemplars = await loadExemplars();
+    const exemplars = await loadExemplars(topic ?? "", evalMode);
 
     const res = await getGenAI().models.generateContent({
       model: MODEL,

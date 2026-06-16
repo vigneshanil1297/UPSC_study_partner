@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGenAI, MODEL } from "@/lib/gemini";
 import { TRANSCRIBE_SYSTEM } from "@/lib/prompts";
+import { requireUser } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -11,6 +12,9 @@ const ALLOWED = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 export async function POST(req: NextRequest) {
   try {
+    if (!(await requireUser(req))) {
+      return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+    }
     const { images } = (await req.json()) as { images?: ImageInput[] };
     if (!images?.length) {
       return NextResponse.json({ error: "No images provided." }, { status: 400 });
