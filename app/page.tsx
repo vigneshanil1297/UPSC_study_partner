@@ -38,7 +38,7 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T, index: num
 }
 
 export default function Home() {
-  const [mode, setMode] = useState<EvalMode>("essay");
+  const [mode, setMode] = useState<EvalMode>("gs");
   const [topic, setTopic] = useState("");
   const [answerFiles, setAnswerFiles] = useState<File[]>([]);
   const [questionFiles, setQuestionFiles] = useState<File[]>([]);
@@ -308,7 +308,7 @@ export default function Home() {
       <section className="mt-8">
         <label className="block text-sm font-semibold">Evaluation mode</label>
         <div className="mt-1 inline-flex rounded-md border border-neutral-300 bg-white p-0.5">
-          {(["essay", "gs"] as const).map((m) => (
+          {(["gs", "essay"] as const).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
@@ -331,7 +331,7 @@ export default function Home() {
             accept="application/pdf"
             multiple
             onChange={(e) => setAnswerFiles(Array.from(e.target.files ?? []))}
-            className="mt-1 block w-full text-sm"
+            className="mt-1 block w-full text-sm text-neutral-600 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-neutral-900 file:px-4 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-neutral-700"
           />
           {answerFiles.length > 0 && (
             <p className="mt-1 text-xs text-neutral-500">{answerFiles.length} PDF(s)</p>
@@ -344,7 +344,7 @@ export default function Home() {
             accept="application/pdf"
             multiple
             onChange={(e) => setQuestionFiles(Array.from(e.target.files ?? []))}
-            className="mt-1 block w-full text-sm"
+            className="mt-1 block w-full text-sm text-neutral-600 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-neutral-900 file:px-4 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-neutral-700"
           />
           {questionFiles.length > 0 && (
             <p className="mt-1 text-xs text-neutral-500">{questionFiles.length} PDF(s)</p>
