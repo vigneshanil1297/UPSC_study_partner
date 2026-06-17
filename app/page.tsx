@@ -1,79 +1,61 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CRITERIA, type Evaluation, type EvalMode } from "@/lib/criteria";
+import { useEffect, useMemo, useState } from "react";
+import type {
+  Annotation,
+  EvalMode,
+  EvalResult,
+  Question,
+  StructuredPage,
+} from "@/lib/criteria";
+import { renderPdfToImages, type ImageInput } from "@/lib/pdf";
+import AnswerSheet from "@/app/components/AnswerSheet";
+import DemandChecklist from "@/app/components/DemandChecklist";
 import {
   supabase,
   historyEnabled,
-  fetchHistory,
-  saveEvaluation,
-  recordToEvaluation,
   signInWithGoogle,
   signOut,
   getAccessToken,
+  fetchHistory,
+  saveEvaluation,
   type EvalRecord,
 } from "@/lib/supabase";
 
-type ImageInput = { media_type: string; data: string };
-
-// Vercel serverless caps the request body at ~4.5MB regardless of
-// next.config bodySizeLimit, so phone photos must be shrunk client-side before
-// upload. Downscale to a max dimension and re-encode as JPEG — Gemini reads the
-// handwriting fine at this resolution and the payload stays well under the cap.
-const MAX_DIM = 1600;
-const JPEG_QUALITY = 0.82;
-
-function compressImage(file: File): Promise<ImageInput> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
-      const w = Math.max(1, Math.round(img.width * scale));
-      const h = Math.max(1, Math.round(img.height * scale));
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("Canvas not supported in this browser."));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
-      resolve({ media_type: "image/jpeg", data: dataUrl.split(",")[1] ?? "" });
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Could not read one of the images."));
-    };
-    img.src = url;
-  });
-}
-
-function scoreColor(score: number, max: number) {
-  const pct = score / max;
-  if (pct >= 0.75) return "text-emerald-700";
-  if (pct >= 0.5) return "text-amber-600";
-  return "text-red-600";
+// Run async tasks with a small concurrency cap — keeps us under Gemini's
+// free-tier rate limit while still transcribing pages in parallel.
+async function mapPool<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>) {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
 }
 
 export default function Home() {
   const [mode, setMode] = useState<EvalMode>("essay");
   const [topic, setTopic] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
-  const [transcript, setTranscript] = useState("");
-  const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const [answerFiles, setAnswerFiles] = useState<File[]>([]);
+  const [questionFiles, setQuestionFiles] = useState<File[]>([]);
+
+  const [pages, setPages] = useState<StructuredPage[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [result, setResult] = useState<EvalResult | null>(null);
+
   const [busy, setBusy] = useState<"transcribe" | "evaluate" | null>(null);
+  const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
+
   const [history, setHistory] = useState<EvalRecord[]>([]);
   const [user, setUser] = useState<{ email: string } | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
-  // Track the Google sign-in session. When Supabase isn't configured, skip auth
-  // entirely (local dev fallback) so the app still runs.
   useEffect(() => {
     if (!supabase) {
       setAuthReady(true);
@@ -89,19 +71,14 @@ export default function Home() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Once signed in, confirm the email is on the server allowlist (via /api/me,
-  // so the list never reaches the browser). Only then load history.
   useEffect(() => {
     if (!historyEnabled || !user) {
       setAuthorized(null);
-      setHistory([]);
       return;
     }
     let cancelled = false;
     getAccessToken()
-      .then((token) =>
-        fetch("/api/me", { headers: { Authorization: `Bearer ${token ?? ""}` } }),
-      )
+      .then((token) => fetch("/api/me", { headers: { Authorization: `Bearer ${token ?? ""}` } }))
       .then((res) => {
         if (cancelled) return;
         setAuthorized(res.ok);
@@ -121,24 +98,83 @@ export default function Home() {
     }
   }
 
+  // Restore a past run into the editor/viewer.
+  function viewRecord(r: EvalRecord) {
+    setMode(r.mode);
+    setQuestions(r.questions);
+    setPages(r.pages);
+    setResult(r.result);
+    setTopic(r.topic);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // Notes grouped by page, so each AnswerSheet only gets its own annotations.
+  const notesByPage = useMemo(() => {
+    const m = new Map<number, Annotation[]>();
+    for (const a of result?.answers ?? []) {
+      for (const n of a.inline_notes) {
+        const arr = m.get(n.page) ?? [];
+        arr.push(n);
+        m.set(n.page, arr);
+      }
+    }
+    return m;
+  }, [result]);
+
+  async function transcribePage(image: ImageInput, pageNumber: number): Promise<StructuredPage> {
+    const token = await getAccessToken();
+    const res = await fetch("/api/transcribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
+      body: JSON.stringify({ image, pageNumber }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? "Transcription failed.");
+    return json.page as StructuredPage;
+  }
+
   async function handleTranscribe() {
     setError("");
-    if (!files.length) {
-      setError("Add at least one image of the answer sheet.");
+    setResult(null);
+    if (!answerFiles.length) {
+      setError("Add the answer-booklet PDF.");
       return;
     }
     setBusy("transcribe");
     try {
-      const images = await Promise.all(files.map(compressImage));
-      const token = await getAccessToken();
-      const res = await fetch("/api/transcribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
-        body: JSON.stringify({ images }),
+      // 1. Render all answer PDFs to page images, numbered globally in order.
+      setProgress("Rendering PDF pages…");
+      const images: ImageInput[] = [];
+      for (const f of answerFiles) images.push(...(await renderPdfToImages(f)));
+
+      // 2. Transcribe each page (structured), small concurrency.
+      let done = 0;
+      const transcribed = await mapPool(images, 3, async (img, i) => {
+        const page = await transcribePage(img, i + 1);
+        done++;
+        setProgress(`Transcribed ${done}/${images.length} pages…`);
+        return page;
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Transcription failed.");
-      setTranscript(json.text);
+      setPages(transcribed);
+
+      // 3. Optional: extract the question paper.
+      if (questionFiles.length) {
+        setProgress("Reading question paper…");
+        const qImages: ImageInput[] = [];
+        for (const f of questionFiles) qImages.push(...(await renderPdfToImages(f)));
+        const token = await getAccessToken();
+        const res = await fetch("/api/extract-questions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
+          body: JSON.stringify({ images: qImages }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Question extraction failed.");
+        setQuestions(json.questions as Question[]);
+      } else {
+        setQuestions([]);
+      }
+      setProgress("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Transcription failed.");
     } finally {
@@ -146,29 +182,54 @@ export default function Home() {
     }
   }
 
+  // Apply an inline correction to a run: replace its text, clear uncertainty.
+  function correctRun(pageNumber: number, lineIndex: number, runIndex: number, text: string) {
+    setPages((prev) =>
+      prev.map((pg) => {
+        if (pg.pageNumber !== pageNumber) return pg;
+        const lines = pg.lines.map((ln, li) => {
+          if (li !== lineIndex) return ln;
+          const runs = ln.runs.map((r, ri) => (ri === runIndex ? { text, uncertain: false } : r));
+          return { ...ln, runs };
+        });
+        return { ...pg, lines };
+      }),
+    );
+  }
+
   async function handleEvaluate() {
     setError("");
-    if (!transcript.trim()) {
-      setError("Transcribe (or paste) the essay first.");
+    if (!pages.length) {
+      setError("Transcribe the answer booklet first.");
       return;
     }
     setBusy("evaluate");
-    setEvaluation(null);
+    setResult(null);
     try {
+      // No question paper but a topic typed → treat it as the single question.
+      const effectiveQuestions =
+        questions.length || !topic.trim()
+          ? questions
+          : [{ number: "1", text: topic.trim(), marks: null }];
+
       const token = await getAccessToken();
       const res = await fetch("/api/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
-        body: JSON.stringify({ topic, essay: transcript, mode }),
+        body: JSON.stringify({ mode, questions: effectiveQuestions, pages }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Evaluation failed.");
-      const ev = json.evaluation as Evaluation;
-      setEvaluation(ev);
+      const evalResult = json.result as EvalResult;
+      setResult(evalResult);
       if (historyEnabled) {
-        saveEvaluation({ mode, topic, transcript, evaluation: ev })
+        const title = effectiveQuestions[0]?.text ?? topic.trim();
+        saveEvaluation({ mode, title, questions: effectiveQuestions, pages, result: evalResult })
           .then(refreshHistory)
           .catch(() => {});
+      }
+      if (typeof window !== "undefined") {
+        document.getElementById("evaluations")?.scrollIntoView({ behavior: "smooth" });
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Evaluation failed.");
@@ -177,20 +238,10 @@ export default function Home() {
     }
   }
 
-  function viewRecord(r: EvalRecord) {
-    setMode(r.mode);
-    setTopic(r.topic);
-    setTranscript(r.transcript);
-    setEvaluation(recordToEvaluation(r));
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
   if (!authReady) {
     return <main className="mx-auto max-w-3xl px-5 py-10 text-sm text-neutral-500">Loading…</main>;
   }
 
-  // Sign-in wall (only when Supabase auth is configured). Server API routes also
-  // enforce the email allowlist, so this is the first layer, not the only one.
   if (historyEnabled && !user) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-5 text-center">
@@ -208,7 +259,6 @@ export default function Home() {
     );
   }
 
-  // Signed in but allowlist check pending / failed.
   if (historyEnabled && user && authorized !== true) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-5 text-center">
@@ -244,7 +294,8 @@ export default function Home() {
       )}
       <h1 className="text-2xl font-bold">UPSC Mains Essay Evaluator</h1>
       <p className="mt-1 text-sm text-neutral-600">
-        Upload handwritten answer pages, review the transcript, then get critical, criterion-wise feedback.
+        Upload the answer-booklet PDF (and optionally the question paper). It transcribes into a
+        digital answer-sheet you can correct, then marks it inline like an examiner.
       </p>
 
       {error && (
@@ -253,7 +304,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* 0. Mode toggle */}
+      {/* Mode toggle */}
       <section className="mt-8">
         <label className="block text-sm font-semibold">Evaluation mode</label>
         <div className="mt-1 inline-flex rounded-md border border-neutral-300 bg-white p-0.5">
@@ -269,126 +320,127 @@ export default function Home() {
             </button>
           ))}
         </div>
-        <p className="mt-1 text-xs text-neutral-500">
-          {mode === "essay"
-            ? "Judged as flowing prose — narrative, thesis, multidimensional canvas."
-            : "Judged as a GS analytical answer — structure, headings, diagrams, directive compliance."}
-        </p>
       </section>
 
-      {/* 1. Topic */}
-      <section className="mt-6">
-        <label className="block text-sm font-semibold">
-          {mode === "essay" ? "Essay topic (optional)" : "Question (optional)"}
-        </label>
-        <input
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          placeholder={
-            mode === "essay"
-              ? "e.g. Forests are the best case studies for economic excellence"
-              : "e.g. Evaluate the role of subsidiary alliance in expanding British control in India."
-          }
-          className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
-        />
+      {/* Uploads */}
+      <section className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-semibold">Answer booklet (PDF)</label>
+          <input
+            type="file"
+            accept="application/pdf"
+            multiple
+            onChange={(e) => setAnswerFiles(Array.from(e.target.files ?? []))}
+            className="mt-1 block w-full text-sm"
+          />
+          {answerFiles.length > 0 && (
+            <p className="mt-1 text-xs text-neutral-500">{answerFiles.length} PDF(s)</p>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-semibold">Question paper (PDF, optional)</label>
+          <input
+            type="file"
+            accept="application/pdf"
+            multiple
+            onChange={(e) => setQuestionFiles(Array.from(e.target.files ?? []))}
+            className="mt-1 block w-full text-sm"
+          />
+          {questionFiles.length > 0 && (
+            <p className="mt-1 text-xs text-neutral-500">{questionFiles.length} PDF(s)</p>
+          )}
+        </div>
       </section>
 
-      {/* 2. Upload + transcribe */}
-      <section className="mt-6">
-        <label className="block text-sm font-semibold">Answer sheet images (pages in order)</label>
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          multiple
-          onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-          className="mt-1 block w-full text-sm"
-        />
-        {files.length > 0 && (
-          <p className="mt-1 text-xs text-neutral-500">{files.length} page(s) selected</p>
-        )}
-        <button
-          onClick={handleTranscribe}
-          disabled={busy !== null}
-          className="mt-3 rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {busy === "transcribe" ? "Transcribing…" : "Transcribe"}
-        </button>
-      </section>
+      {/* Topic fallback when no question paper is uploaded */}
+      {questionFiles.length === 0 && (
+        <section className="mt-4">
+          <label className="block text-sm font-semibold">
+            {mode === "essay" ? "Essay topic (optional)" : "Question (optional)"}
+          </label>
+          <input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder={
+              mode === "essay"
+                ? "e.g. Forests are the best case studies for economic excellence"
+                : "e.g. Evaluate the role of subsidiary alliance in expanding British control in India."
+            }
+            className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+          />
+        </section>
+      )}
 
-      {/* 3. Editable transcript */}
-      <section className="mt-6">
-        <label className="block text-sm font-semibold">Transcript (edit any mis-reads before evaluating)</label>
-        <textarea
-          value={transcript}
-          onChange={(e) => setTranscript(e.target.value)}
-          rows={12}
-          placeholder="Transcribed essay appears here. You can also paste text directly."
-          className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 font-mono text-sm"
-        />
-        <button
-          onClick={handleEvaluate}
-          disabled={busy !== null}
-          className="mt-3 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {busy === "evaluate" ? "Evaluating…" : mode === "essay" ? "Evaluate essay" : "Evaluate answer"}
-        </button>
-      </section>
+      <button
+        onClick={handleTranscribe}
+        disabled={busy !== null}
+        className="mt-4 rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+      >
+        {busy === "transcribe" ? "Transcribing…" : "Transcribe"}
+      </button>
+      {progress && <span className="ml-3 text-xs text-neutral-500">{progress}</span>}
 
-      {/* 4. Results */}
-      {evaluation && (
-        <section className="mt-10">
-          <div className="rounded-lg border border-neutral-300 bg-white p-5">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-lg font-bold">Overall</h2>
-              <span className={`text-2xl font-bold ${scoreColor(evaluation.overall_score, 100)}`}>
-                {evaluation.overall_score}/100
-              </span>
-            </div>
-            <p className="mt-2 text-sm italic text-neutral-700">{evaluation.one_line_verdict}</p>
+      {/* Extracted questions */}
+      {questions.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-sm font-semibold">Questions detected ({questions.length})</h2>
+          <ul className="mt-2 space-y-1 rounded-md border border-neutral-200 bg-white p-3 text-sm">
+            {questions.map((q) => (
+              <li key={q.number}>
+                <span className="font-medium">Q{q.number}</span>
+                {q.marks ? <span className="text-neutral-400"> ({q.marks})</span> : null} — {q.text}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <h3 className="text-sm font-semibold text-emerald-700">Strengths</h3>
-                <ul className="mt-1 list-disc pl-5 text-sm text-neutral-700">
-                  {evaluation.top_strengths.map((s, i) => <li key={i}>{s}</li>)}
-                </ul>
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-red-600">Priorities</h3>
-                <ul className="mt-1 list-disc pl-5 text-sm text-neutral-700">
-                  {evaluation.top_priorities.map((s, i) => <li key={i}>{s}</li>)}
-                </ul>
-              </div>
-            </div>
+      {/* Digital answer-sheet pages */}
+      {pages.length > 0 && (
+        <section className="mt-8">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-lg font-bold">Answer sheet</h2>
+            <span className="text-xs text-neutral-500">
+              Highlighted words are uncertain — click to correct before evaluating.
+            </span>
+          </div>
+          <div className="mt-3 space-y-6">
+            {pages.map((page) => (
+              <AnswerSheet
+                key={page.pageNumber}
+                page={page}
+                notes={notesByPage.get(page.pageNumber)}
+                onCorrect={(li, ri, text) => correctRun(page.pageNumber, li, ri, text)}
+              />
+            ))}
           </div>
 
-          <div className="mt-6 space-y-4">
-            {CRITERIA.map((c) => {
-              const r = evaluation.criteria[c.key];
-              if (!r) return null;
-              return (
-                <div key={c.key} className="rounded-lg border border-neutral-200 bg-white p-4">
-                  <div className="flex items-baseline justify-between">
-                    <h3 className="font-semibold">{c.label}</h3>
-                    <span className={`font-bold ${scoreColor(r.score, 10)}`}>{r.score}/10</span>
-                  </div>
-                  {r.evidence && (
-                    <blockquote className="mt-2 border-l-2 border-neutral-300 pl-3 text-sm italic text-neutral-600">
-                      “{r.evidence}”
-                    </blockquote>
-                  )}
-                  <p className="mt-2 text-sm text-neutral-800">{r.critique}</p>
-                  <p className="mt-1 text-sm text-emerald-800">
-                    <span className="font-medium">Improve:</span> {r.improvement}
-                  </p>
-                </div>
-              );
-            })}
+          <button
+            onClick={handleEvaluate}
+            disabled={busy !== null}
+            className="mt-5 rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {busy === "evaluate" ? "Evaluating…" : "Evaluate"}
+          </button>
+        </section>
+      )}
+
+      {/* Per-answer evaluation */}
+      {result && (
+        <section id="evaluations" className="mt-10">
+          <h2 className="text-lg font-bold">Evaluation</h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Red notes appear in the margins above; the focus below is what to add for extra marks.
+          </p>
+          <div className="mt-3 space-y-4">
+            {result.answers.map((ev, i) => (
+              <DemandChecklist key={i} ev={ev} />
+            ))}
           </div>
         </section>
       )}
 
-      {/* 5. History */}
+      {/* History */}
       {historyEnabled && history.length > 0 && (
         <section className="mt-12 border-t border-neutral-200 pt-8">
           <div className="flex items-baseline justify-between">
@@ -423,9 +475,7 @@ export default function Home() {
                       {r.mode === "essay" ? "Essay" : "GS"} · {new Date(r.created_at).toLocaleString()}
                     </span>
                   </span>
-                  <span className={`shrink-0 font-bold ${scoreColor(r.overall_score, 100)}`}>
-                    {r.overall_score}/100
-                  </span>
+                  <span className="shrink-0 font-bold text-neutral-800">{r.overall_score}/100</span>
                 </button>
               </li>
             ))}

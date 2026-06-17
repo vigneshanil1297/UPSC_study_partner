@@ -10,3 +10,70 @@ body {
   color: var(--foreground);
   font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
+
+/* --- Digital answer-sheet (mirrors the scanned page layout) --- */
+
+/* Ruled paper: faint horizontal rule lines + a red left margin rule, like a
+   real answer booklet. Line height is tuned to sit text on the rules. */
+.sheet {
+  position: relative;
+  background-color: #fffefb;
+  background-image:
+    /* horizontal ruling */
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 35px,
+      #cfe0ee 35px,
+      #cfe0ee 36px
+    );
+  border: 1px solid #e4e0d8;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 18px 28px 28px 56px;
+}
+
+/* The red margin rule down the left. */
+.sheet::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 42px;
+  width: 1px;
+  background: #f0b3b3;
+}
+
+.font-hand {
+  font-family: var(--font-hand), "Comic Sans MS", cursive;
+}
+
+/* Each transcribed line sits on a rule. */
+.sheet-line {
+  min-height: 36px;
+  line-height: 36px;
+  font-size: 17px;
+}
+
+/* Low-confidence OCR word: highlighted + editable. */
+.run-uncertain {
+  background: #fff3a3;
+  border-radius: 3px;
+  padding: 0 2px;
+  outline: none;
+  cursor: text;
+}
+.run-uncertain:focus {
+  background: #fde68a;
+  /* While editing, drop to a legible font so the user can correct accurately. */
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  box-shadow: 0 0 0 2px #f59e0b;
+}
+
+/* Examiner's margin note (req 6), in a cursive hand. Colour comes from a
+   per-type utility class so "praise" can stay green. */
+.note-hand {
+  font-family: var(--font-note), cursive;
+  font-size: 15px;
+  line-height: 1.35;
+}

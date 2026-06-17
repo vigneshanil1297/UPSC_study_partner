@@ -44,3 +44,85 @@ export const EvaluationSchema = z.object({
 });
 
 export type Evaluation = z.infer<typeof EvaluationSchema>;
+
+// ---------------------------------------------------------------------------
+// Structured transcript model (layout-faithful answer-sheet rendering).
+// A page is a list of lines; a line is a list of runs (word/phrase spans).
+// `uncertain` runs are the OCR's low-confidence reads — highlighted on the page
+// and editable inline by the user before evaluation.
+// ---------------------------------------------------------------------------
+
+export const RunSchema = z.object({
+  text: z.string(),
+  uncertain: z.boolean().describe("True if the OCR was unsure of this word/phrase."),
+});
+export type Run = z.infer<typeof RunSchema>;
+
+export const LineSchema = z.object({
+  kind: z
+    .enum(["heading", "body", "question-number", "note"])
+    .describe("Structural role of the line, inferred from the scan's layout."),
+  underline: z.boolean().describe("True if the writer underlined this line."),
+  runs: z.array(RunSchema),
+});
+export type Line = z.infer<typeof LineSchema>;
+
+export const StructuredPageSchema = z.object({
+  pageNumber: z.number(),
+  questionNumber: z
+    .string()
+    .nullable()
+    .describe("The answer's question number if this page starts/continues one (e.g. '1', '5(a)'), else null."),
+  lines: z.array(LineSchema),
+});
+export type StructuredPage = z.infer<typeof StructuredPageSchema>;
+
+export type Transcript = { pages: StructuredPage[] };
+
+// A question lifted from the (optional) question-paper PDF.
+export const QuestionSchema = z.object({
+  number: z.string().describe("Question number as printed, e.g. '1', '5(a)'."),
+  text: z.string(),
+  marks: z.number().nullable().describe("Marks for the question if printed, else null."),
+});
+export type Question = z.infer<typeof QuestionSchema>;
+
+// ---------------------------------------------------------------------------
+// Evaluation model — value-add first (req 7). The examiner's red notes are
+// anchored to a page + line so they render inline beside the relevant spot.
+// ---------------------------------------------------------------------------
+
+export const AnnotationSchema = z.object({
+  page: z.number().describe("1-based page number the note refers to."),
+  lineIndex: z.number().describe("0-based index of the line within that page."),
+  type: z.enum(["add", "fix", "praise"]).describe("add = value to insert; fix = correction; praise = strong point."),
+  text: z.string().describe("The examiner's note, written in the second person."),
+});
+export type Annotation = z.infer<typeof AnnotationSchema>;
+
+export const DemandSchema = z.object({
+  point: z.string().describe("One expected point/dimension the question demands."),
+  status: z.enum(["hit", "partial", "missed"]),
+});
+export type Demand = z.infer<typeof DemandSchema>;
+
+export const AnswerEvaluationSchema = z.object({
+  questionNumber: z.string().nullable(),
+  core_demand_met: z
+    .enum(["met", "partial", "not"])
+    .describe("Has the answer met the core demand of the question?"),
+  score: z.number().describe("Marks awarded out of the question's max (or out of 10 if unknown)."),
+  max_score: z.number().describe("Maximum marks for this question."),
+  one_line: z.string().describe("One-line examiner verdict."),
+  demands: z.array(DemandSchema).describe("The question's own expected points and whether the answer hit them."),
+  value_additions: z
+    .array(z.string())
+    .describe("2-4 concrete extra sentences/points that would add incremental marks. The main output."),
+  inline_notes: z.array(AnnotationSchema).describe("Red margin notes anchored to page+line."),
+});
+export type AnswerEvaluation = z.infer<typeof AnswerEvaluationSchema>;
+
+export const EvalResultSchema = z.object({
+  answers: z.array(AnswerEvaluationSchema),
+});
+export type EvalResult = z.infer<typeof EvalResultSchema>;
