@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
-import { getGenAI, MODEL } from "@/lib/gemini";
+import { getGenAI, MODEL_EXTRACT, withRetry } from "@/lib/gemini";
 import { EXTRACT_QUESTIONS_SYSTEM } from "@/lib/prompts";
 import { QuestionSchema } from "@/lib/criteria";
 import { requireUser } from "@/lib/auth-server";
@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const res = await getGenAI().models.generateContent({
-      model: MODEL,
+    const res = await withRetry(() => getGenAI().models.generateContent({
+      model: MODEL_EXTRACT,
       contents: [
         ...images.map((img) => ({ inlineData: { mimeType: img.media_type, data: img.data } })),
         { text: "Extract the question list from these question-paper page(s)." },
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA,
       },
-    });
+    }));
 
     const raw = res.text;
     if (!raw) {

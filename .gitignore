@@ -11,3 +11,6 @@ next-env.d.ts
 # Source topper PDFs — used to build lib/knowledge-base.ts, not needed at runtime.
 # ~110MB of scans; keep them out of the repo and the Vercel bundle.
 toppers papers/
+
+# TS incremental build cache
+tsconfig.tsbuildinfo

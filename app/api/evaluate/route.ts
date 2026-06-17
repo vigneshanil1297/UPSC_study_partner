@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
-import { getGenAI, MODEL } from "@/lib/gemini";
+import { getGenAI, MODEL_EVALUATE, withRetry } from "@/lib/gemini";
 import {
   EvalResultSchema,
   StructuredPageSchema,
@@ -91,8 +91,8 @@ export async function POST(req: NextRequest) {
     const topicHint = questions.map((q) => q.text).join(" ");
     const exemplars = await loadExemplars(topicHint, evalMode);
 
-    const res = await getGenAI().models.generateContent({
-      model: MODEL,
+    const res = await withRetry(() => getGenAI().models.generateContent({
+      model: MODEL_EVALUATE,
       contents: [{ text: evaluationUser(questions, pages, evalMode) }],
       config: {
         systemInstruction: evaluationSystem(exemplars, evalMode),
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA,
       },
-    });
+    }));
 
     const raw = res.text;
     if (!raw) {

@@ -149,7 +149,7 @@ export default function Home() {
 
       // 2. Transcribe each page (structured), small concurrency.
       let done = 0;
-      const transcribed = await mapPool(images, 3, async (img, i) => {
+      const transcribed = await mapPool(images, 1, async (img, i) => {
         const page = await transcribePage(img, i + 1);
         done++;
         setProgress(`Transcribed ${done}/${images.length} pages…`);

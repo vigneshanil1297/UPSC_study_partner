@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
-import { getGenAI, MODEL } from "@/lib/gemini";
+import { getGenAI, MODEL_TRANSCRIBE, withRetry } from "@/lib/gemini";
 import { TRANSCRIBE_SYSTEM } from "@/lib/prompts";
 import { StructuredPageSchema } from "@/lib/criteria";
 import { requireUser } from "@/lib/auth-server";
@@ -63,8 +63,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const res = await getGenAI().models.generateContent({
-      model: MODEL,
+    const res = await withRetry(() => getGenAI().models.generateContent({
+      model: MODEL_TRANSCRIBE,
       contents: [
         { inlineData: { mimeType: image.media_type, data: image.data } },
         { text: `Transcribe this answer-sheet page. It is page ${pageNumber ?? 1}.` },
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA,
       },
-    });
+    }));
 
     const raw = res.text;
     if (!raw) {
