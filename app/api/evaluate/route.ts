@@ -37,6 +37,7 @@ const answerSchema = {
       },
     },
     value_additions: { type: Type.ARRAY, items: { type: Type.STRING } },
+    structure_note: { type: Type.STRING, nullable: true },
     inline_notes: {
       type: Type.ARRAY,
       items: {
@@ -59,6 +60,7 @@ const answerSchema = {
     "one_line",
     "demands",
     "value_additions",
+    "structure_note",
     "inline_notes",
   ],
 };

@@ -48,6 +48,99 @@ body {
   font-family: var(--font-hand), "Comic Sans MS", cursive;
 }
 
+/* --- Layout-faithful page (mocks the real PDF page: frame + true positions) --- */
+
+/* Outer wrapper = the booklet sheet, with drop shadow + paper edge. */
+.sheet-frame {
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  background: #fffefb;
+  padding: 10px;
+}
+
+/* The page itself: aspect-ratio set inline from the scan. container-type:size
+   lets line font-sizes scale with the page via cqh units. The printed booklet
+   frame (outer border + red left margin + faint ruling) is drawn here (req 4). */
+.sheet-page {
+  position: relative;
+  width: 100%;
+  container-type: size;
+  background-color: #fffefb;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2.9%,
+    #e6eef6 2.9%,
+    #e6eef6 3.05%
+  );
+  border: 1.5px solid #b9b2a4;
+  outline: 3px solid #fffefb;
+  outline-offset: -7px;
+  box-shadow: inset 0 0 0 1px #d8d2c6;
+}
+
+/* Red left margin rule of the answer booklet. */
+.sheet-page::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 8%;
+  width: 1px;
+  background: #e8a9a9;
+}
+
+/* An absolutely-positioned transcribed line, placed by its box. */
+.sheet-line-abs {
+  position: absolute;
+  white-space: nowrap;
+  line-height: 1;
+  transform: translateY(-12%);
+}
+
+/* A hand-drawn horizontal divider rule (req 2). */
+.sheet-divider {
+  position: absolute;
+  height: 0;
+  border-top: 1.5px solid #5b5346;
+  transform: translateY(-50%);
+}
+.sheet-divider-flow {
+  border: 0;
+  border-top: 1.5px solid #5b5346;
+  margin: 8px 0;
+}
+
+/* A pasted diagram crop (req 5): background already masked to transparent. */
+.sheet-diagram {
+  position: absolute;
+  object-fit: contain;
+  pointer-events: none;
+}
+.sheet-diagram-missing {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #b9b2a4;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.02);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  color: #8a8275;
+  text-align: center;
+  padding: 2px;
+}
+
+/* Examiner mark anchored beside a positioned line. */
+.note-abs {
+  position: absolute;
+  max-width: 28%;
+  font-family: var(--font-note), cursive;
+  font-size: 2.4cqh;
+  line-height: 1.2;
+}
+
 /* Each transcribed line sits on a rule. */
 .sheet-line {
   min-height: 36px;

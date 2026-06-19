@@ -8,7 +8,8 @@ import type {
   Question,
   StructuredPage,
 } from "@/lib/criteria";
-import { renderPdfToImages, type ImageInput } from "@/lib/pdf";
+import { renderPdfToImages, cropDiagramToPng, type ImageInput, type RenderedPage } from "@/lib/pdf";
+import { computeStructure } from "@/lib/structure";
 import AnswerSheet from "@/app/components/AnswerSheet";
 import DemandChecklist from "@/app/components/DemandChecklist";
 import {
@@ -121,6 +122,21 @@ export default function Home() {
     return m;
   }, [result]);
 
+  // Candidate structure stats (points + intro/body/conclusion spatial ratio)
+  // per answer, keyed by question number, for the benchmark comparison (req 6).
+  const structureByQ = useMemo(() => {
+    const groups = new Map<string, StructuredPage[]>();
+    for (const pg of pages) {
+      const key = pg.questionNumber ?? "?";
+      const arr = groups.get(key) ?? [];
+      arr.push(pg);
+      groups.set(key, arr);
+    }
+    const m = new Map<string, ReturnType<typeof computeStructure>>();
+    for (const [k, pgs] of groups) m.set(k, computeStructure(pgs));
+    return m;
+  }, [pages]);
+
   async function transcribePage(image: ImageInput, pageNumber: number): Promise<StructuredPage> {
     const token = await getAccessToken();
     const res = await fetch("/api/transcribe", {
@@ -142,17 +158,30 @@ export default function Home() {
     }
     setBusy("transcribe");
     try {
-      // 1. Render all answer PDFs to page images, numbered globally in order.
+      // 1. Render all answer PDFs to page images (with dims), numbered in order.
       setProgress("Rendering PDF pages…");
-      const images: ImageInput[] = [];
-      for (const f of answerFiles) images.push(...(await renderPdfToImages(f)));
+      const rendered: RenderedPage[] = [];
+      for (const f of answerFiles) rendered.push(...(await renderPdfToImages(f)));
 
-      // 2. Transcribe each page (structured), small concurrency.
+      // 2. Transcribe each page (structured), small concurrency. Then keep the
+      //    page's true aspect ratio and crop any diagrams out of the scan,
+      //    masking the paper so they paste in as clean figures (req 4, 5).
       let done = 0;
-      const transcribed = await mapPool(images, 1, async (img, i) => {
-        const page = await transcribePage(img, i + 1);
+      const transcribed = await mapPool(rendered, 1, async (rp, i) => {
+        const page = await transcribePage(rp.input, i + 1);
+        page.aspect = rp.height / rp.width;
+        await Promise.all(
+          (page.diagrams ?? []).map(async (d) => {
+            try {
+              const png = await cropDiagramToPng(rp.input, d.box);
+              if (png) d.png = png;
+            } catch {
+              // Leave png unset → a captioned placeholder renders instead.
+            }
+          }),
+        );
         done++;
-        setProgress(`Transcribed ${done}/${images.length} pages…`);
+        setProgress(`Transcribed ${done}/${rendered.length} pages…`);
         return page;
       });
       setPages(transcribed);
@@ -161,7 +190,9 @@ export default function Home() {
       if (questionFiles.length) {
         setProgress("Reading question paper…");
         const qImages: ImageInput[] = [];
-        for (const f of questionFiles) qImages.push(...(await renderPdfToImages(f)));
+        for (const f of questionFiles) {
+          qImages.push(...(await renderPdfToImages(f)).map((rp) => rp.input));
+        }
         const token = await getAccessToken();
         const res = await fetch("/api/extract-questions", {
           method: "POST",
@@ -189,7 +220,7 @@ export default function Home() {
         if (pg.pageNumber !== pageNumber) return pg;
         const lines = pg.lines.map((ln, li) => {
           if (li !== lineIndex) return ln;
-          const runs = ln.runs.map((r, ri) => (ri === runIndex ? { text, uncertain: false } : r));
+          const runs = ln.runs.map((r, ri) => (ri === runIndex ? { ...r, text, uncertain: false } : r));
           return { ...ln, runs };
         });
         return { ...pg, lines };
@@ -212,11 +243,18 @@ export default function Home() {
           ? questions
           : [{ number: "1", text: topic.trim(), marks: null }];
 
+      // Strip the (large, base64) diagram PNGs — the evaluator only needs the
+      // text/structure, and they'd bloat the request body past Vercel's cap.
+      const leanPages = pages.map((p) => ({
+        ...p,
+        diagrams: p.diagrams.map((d) => ({ box: d.box, caption: d.caption })),
+      }));
+
       const token = await getAccessToken();
       const res = await fetch("/api/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
-        body: JSON.stringify({ mode, questions: effectiveQuestions, pages }),
+        body: JSON.stringify({ mode, questions: effectiveQuestions, pages: leanPages }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Evaluation failed.");
@@ -434,7 +472,11 @@ export default function Home() {
           </p>
           <div className="mt-3 space-y-4">
             {result.answers.map((ev, i) => (
-              <DemandChecklist key={i} ev={ev} />
+              <DemandChecklist
+                key={i}
+                ev={ev}
+                structure={ev.questionNumber ? structureByQ.get(ev.questionNumber) : undefined}
+              />
             ))}
           </div>
         </section>

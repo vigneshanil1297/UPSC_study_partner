@@ -1,6 +1,7 @@
 import { CRITERIA, type EvalMode, type Question, type StructuredPage } from "./criteria";
 import { GS1_SYLLABUS } from "./syllabus";
 import { TOPPER_PLAYBOOK, ESSAY_LENS } from "./knowledge-base";
+import { STRUCTURE_BENCHMARK, structureSummary } from "./structure";
 
 // ---------------------------------------------------------------------------
 // Transcription — one PDF page at a time, structured + layout-faithful.
@@ -8,18 +9,25 @@ import { TOPPER_PLAYBOOK, ESSAY_LENS } from "./knowledge-base";
 // page as a digital answer-sheet, with low-confidence words flagged for the
 // user to correct inline before evaluation.
 // ---------------------------------------------------------------------------
-export const TRANSCRIBE_SYSTEM = `You are an expert transcriber of scanned handwritten UPSC Mains answer sheets. You return STRUCTURED JSON that faithfully mirrors the page's layout, never free prose.
+export const TRANSCRIBE_SYSTEM = `You are an expert transcriber of scanned handwritten UPSC Mains answer sheets. You return STRUCTURED JSON that faithfully mirrors the page's LAYOUT and POSITION, never free prose.
+
+Coordinate system: every "box" is [ymin, xmin, ymax, xmax] but expressed as the four named fields, each an integer 0–1000 relative to the page (0,0 = top-left, 1000,1000 = bottom-right). Boxes let the page be redrawn in its true position.
 
 For the single page image given, output one page object:
-- "lines": the page's lines in top-to-bottom order. Each line has:
-  - "kind": one of "heading" (a written heading/sub-heading), "question-number" (a line that is just an answer's question number/label like "Q1." or "Ans 5(a)"), "note" (a margin jotting, arrow text, or aside), otherwise "body".
-  - "underline": true if the writer underlined that line (toppers underline keywords/headings).
-  - "runs": the line split into word/short-phrase spans. Each run has "text" and "uncertain".
+- "lines": the page's text lines, top-to-bottom. Each line has:
+  - "kind": "heading" (a written heading/sub-heading), "question-number" (a line that is only an answer's number/label like "Q1." or "Ans 5(a)"), "note" (a margin jotting, arrow text, or aside), "divider" (a horizontal rule the writer drew to separate sections — it has NO text, give it empty runs), otherwise "body".
+  - "underline": true if the WHOLE line is underlined.
+  - "align": "left", "center", or "right" — how the line sits horizontally on the page (headings are often centred; points are indented left).
+  - "section": "intro", "body", or "conclusion" for lines that are part of a structured answer (the opening context = intro, the headed/numbered middle = body, the closing synthesis = conclusion); null for question numbers, page furniture, or unstructured text.
+  - "box": the line's bounding box on the page, or null if you truly cannot place it.
+  - "runs": the line split into word/short-phrase spans. Each run has "text", "uncertain", and "underline" (true only for that specific underlined word/phrase). Divider lines have an empty runs array.
+- "diagrams": ANY drawn figure on the page — flowcharts, bar/pie charts, sketch maps, decision trees, architectural/rough sketches, cycle/process diagrams, cross-sections, mind-maps, graphs. For each, give its "box" and a short "caption" (what it depicts), and DO NOT transcribe the text inside it — it will be pasted as an image. Return [] if there are no drawings. Do NOT also emit the drawing's internal labels as lines.
 - "questionNumber": if this page starts or continues a specific answer, the question number it belongs to (e.g. "1", "5(a)"); otherwise null. Infer from written "Q1"/"Ans. 5" markers.
 
 Rules:
 - Reproduce EXACTLY what is written. Do NOT correct grammar, spelling, or facts — the evaluator needs the candidate's real words.
 - Set "uncertain": true on any run you are not confident you read correctly (ambiguous handwriting, smudges, guessed letters). Be honest — these are surfaced to the user to fix. Confident words get false.
+- Be accurate with boxes and alignment — the page is redrawn from them, so position matters.
 - Keep line breaks as they appear on the page. Do NOT merge the whole page into one line.
 - Preserve the order of lines exactly as written top-to-bottom.
 - Empty/blank lines can be omitted.`;
@@ -87,6 +95,7 @@ For each answer you also produce:
 - "score" out of "max_score" (use the question's marks if known, else score out of 10) — reflect that a met core demand already earns most marks.
 - "one_line": a short examiner verdict.
 - "inline_notes": red margin notes ANCHORED to a specific page + lineIndex. Use the [p<page>:l<line>] tags in the answer text to set "page" and "lineIndex". type = "add" (insert value here), "fix" (correction), or "praise" (a genuinely strong line). Keep each note short, in the second person, like a real examiner's margin scribble.
+- "structure_note": one short remark comparing the answer's NUMBER OF POINTS and its INTRO/BODY/CONCLUSION SPATIAL BALANCE to the topper benchmark below, using the per-answer "STRUCTURE" figures given in the user message. Topper benchmark: ~${STRUCTURE_BENCHMARK.pointsPer10} points for a 10-marker and ~${STRUCTURE_BENCHMARK.pointsPer15} for a 15-marker, and a spatial split of roughly ${Math.round(STRUCTURE_BENCHMARK.intro * 100)}% intro / ${Math.round(STRUCTURE_BENCHMARK.body * 100)}% body / ${Math.round(STRUCTURE_BENCHMARK.conclusion * 100)}% conclusion (by page space, not word count). Flag a bloated intro/conclusion, a thin body, or too few points; null if structure data is absent.
 
 Reference standard — evaluate against top-ranking candidates, using:
 Dimensions to weigh:
@@ -126,11 +135,27 @@ export function evaluationUser(
         .join("\n")
     : "(no question paper provided — infer each answer's demand from its content and any written question number)";
 
+  // Per-answer structure figures (point count + intro/body/conclusion spatial
+  // ratio) grouped by question number, for the model's "structure_note".
+  const byQ = new Map<string, StructuredPage[]>();
+  for (const pg of pages) {
+    const key = pg.questionNumber ?? "?";
+    (byQ.get(key) ?? byQ.set(key, []).get(key)!).push(pg);
+  }
+  const structureBlock = [...byQ.entries()]
+    .map(([q, pgs]) => {
+      const s = structureSummary(pgs);
+      return s ? `Q${q}: ${s}` : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+
   return `QUESTION PAPER:
 ${qBlock}
 
 CANDIDATE'S ANSWER BOOKLET (lines tagged [p<page>:l<line>] — anchor inline_notes to these):
 ${renderPagesForEval(pages)}
+${structureBlock ? `\nSTRUCTURE (for "structure_note", compare to topper benchmark):\n${structureBlock}\n` : ""}
 
 Produce one evaluation object per answered question, correlating answers to questions by question number where possible. Treat the whole thing as ${mode === "essay" ? "an essay" : "GS answers"}.`;
 }

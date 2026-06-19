@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
-import { Homemade_Apple, Cedarville_Cursive } from "next/font/google";
+import { Cedarville_Cursive, Playwrite_IN } from "next/font/google";
 import "./globals.css";
 
-// Handwritten display font for the digital answer-sheet (req 3).
-const handwriting = Homemade_Apple({
+// Handwritten display font for the transcribed answer-sheet (req 3).
+const handwriting = Cedarville_Cursive({
   weight: "400",
   subsets: ["latin"],
   variable: "--font-hand",
   display: "swap",
 });
 
-// Cursive font for the examiner's red notes written over the answers.
-const noteFont = Cedarville_Cursive({
+// Cursive font for the examiner's red evaluation marks over the answers (req 3).
+// Playwrite IN ships no `subsets`/`preload` options.
+const noteFont = Playwrite_IN({
   weight: "400",
-  subsets: ["latin"],
   variable: "--font-note",
   display: "swap",
 });

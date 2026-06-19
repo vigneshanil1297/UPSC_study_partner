@@ -52,20 +52,51 @@ export type Evaluation = z.infer<typeof EvaluationSchema>;
 // and editable inline by the user before evaluation.
 // ---------------------------------------------------------------------------
 
+// Bounding box in Gemini's native normalised convention: each value 0–1000,
+// [ymin, xmin, ymax, xmax] relative to the page's top-left. Used to redraw lines
+// and diagrams in their true position rather than stacked left-aligned.
+export const BoxSchema = z.object({
+  ymin: z.number(),
+  xmin: z.number(),
+  ymax: z.number(),
+  xmax: z.number(),
+});
+export type Box = z.infer<typeof BoxSchema>;
+
 export const RunSchema = z.object({
   text: z.string(),
   uncertain: z.boolean().describe("True if the OCR was unsure of this word/phrase."),
+  // Defaulted so transcripts saved before per-run underlining still parse.
+  underline: z.boolean().default(false).describe("True if this specific word/phrase is underlined on the page."),
 });
 export type Run = z.infer<typeof RunSchema>;
 
 export const LineSchema = z.object({
   kind: z
-    .enum(["heading", "body", "question-number", "note"])
-    .describe("Structural role of the line, inferred from the scan's layout."),
-  underline: z.boolean().describe("True if the writer underlined this line."),
+    .enum(["heading", "body", "question-number", "note", "divider"])
+    .describe("Structural role of the line. 'divider' = a horizontal rule the writer drew across the page (no text)."),
+  underline: z.boolean().describe("True if the whole line is underlined."),
+  // The fields below are defaulted so older box-less transcripts still parse.
+  align: z.enum(["left", "center", "right"]).default("left").describe("Horizontal alignment of the line on the page."),
+  section: z
+    .enum(["intro", "body", "conclusion"])
+    .nullable()
+    .default(null)
+    .describe("Which part of the answer this line belongs to, or null if not part of a structured answer."),
+  box: BoxSchema.nullable().default(null).describe("Position of the line on the page (0–1000), or null if unknown."),
   runs: z.array(RunSchema),
 });
 export type Line = z.infer<typeof LineSchema>;
+
+// A drawn region (flowchart, graph, map, sketch, decision tree, etc.) that is
+// pasted as an image rather than transcribed. `png` is filled in client-side
+// after cropping the region out of the rendered page and masking the paper.
+export const DiagramSchema = z.object({
+  box: BoxSchema.describe("Position of the diagram on the page (0–1000)."),
+  caption: z.string().nullable().describe("Short label of what the drawing depicts, if discernible."),
+  png: z.string().optional().describe("Client-filled: base64 PNG data URL of the cropped, background-masked drawing."),
+});
+export type Diagram = z.infer<typeof DiagramSchema>;
 
 export const StructuredPageSchema = z.object({
   pageNumber: z.number(),
@@ -73,7 +104,10 @@ export const StructuredPageSchema = z.object({
     .string()
     .nullable()
     .describe("The answer's question number if this page starts/continues one (e.g. '1', '5(a)'), else null."),
+  aspect: z.number().optional().describe("Client-filled: page height / width, for faithful page proportions."),
   lines: z.array(LineSchema),
+  // Defaulted so transcripts saved before diagram detection still parse.
+  diagrams: z.array(DiagramSchema).default([]).describe("Drawn figures on the page, to paste as images."),
 });
 export type StructuredPage = z.infer<typeof StructuredPageSchema>;
 
@@ -118,6 +152,10 @@ export const AnswerEvaluationSchema = z.object({
   value_additions: z
     .array(z.string())
     .describe("2-4 concrete extra sentences/points that would add incremental marks. The main output."),
+  structure_note: z
+    .string()
+    .nullable()
+    .describe("One examiner remark on how the answer's number of points and intro/body/conclusion spatial balance compares to the topper benchmark."),
   inline_notes: z.array(AnnotationSchema).describe("Red margin notes anchored to page+line."),
 });
 export type AnswerEvaluation = z.infer<typeof AnswerEvaluationSchema>;

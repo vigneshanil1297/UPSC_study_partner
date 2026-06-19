@@ -12,6 +12,18 @@ type ImageInput = { media_type: string; data: string };
 
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
+// Box [ymin, xmin, ymax, xmax], each 0–1000.
+const BOX = {
+  type: Type.OBJECT,
+  properties: {
+    ymin: { type: Type.NUMBER },
+    xmin: { type: Type.NUMBER },
+    ymax: { type: Type.NUMBER },
+    xmax: { type: Type.NUMBER },
+  },
+  required: ["ymin", "xmin", "ymax", "xmax"],
+};
+
 // Structured single-page transcription schema (OpenAPI subset for Gemini).
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
@@ -23,8 +35,11 @@ const RESPONSE_SCHEMA = {
       items: {
         type: Type.OBJECT,
         properties: {
-          kind: { type: Type.STRING, enum: ["heading", "body", "question-number", "note"] },
+          kind: { type: Type.STRING, enum: ["heading", "body", "question-number", "note", "divider"] },
           underline: { type: Type.BOOLEAN },
+          align: { type: Type.STRING, enum: ["left", "center", "right"] },
+          section: { type: Type.STRING, enum: ["intro", "body", "conclusion"], nullable: true },
+          box: { ...BOX, nullable: true },
           runs: {
             type: Type.ARRAY,
             items: {
@@ -32,16 +47,28 @@ const RESPONSE_SCHEMA = {
               properties: {
                 text: { type: Type.STRING },
                 uncertain: { type: Type.BOOLEAN },
+                underline: { type: Type.BOOLEAN },
               },
-              required: ["text", "uncertain"],
+              required: ["text", "uncertain", "underline"],
             },
           },
         },
-        required: ["kind", "underline", "runs"],
+        required: ["kind", "underline", "align", "section", "box", "runs"],
+      },
+    },
+    diagrams: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          box: BOX,
+          caption: { type: Type.STRING, nullable: true },
+        },
+        required: ["box", "caption"],
       },
     },
   },
-  required: ["pageNumber", "questionNumber", "lines"],
+  required: ["pageNumber", "questionNumber", "lines", "diagrams"],
 };
 
 export async function POST(req: NextRequest) {
@@ -71,7 +98,7 @@ export async function POST(req: NextRequest) {
       ],
       config: {
         systemInstruction: TRANSCRIBE_SYSTEM,
-        maxOutputTokens: 8000,
+        maxOutputTokens: 12000,
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA,
       },
