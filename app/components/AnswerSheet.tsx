@@ -1,6 +1,5 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
 import type { Annotation, Line, StructuredPage } from "@/lib/criteria";
 
 type Props = {
@@ -58,31 +57,16 @@ function Runs({
   );
 }
 
-// One standard font size for all transcribed lines, in container-query height
+// One standard font size for EVERY transcribed line, in container-query height
 // units (1cqh = 1% of page height) so it scales with the page but stays uniform
-// line-to-line. fitLinesToWidth() shrinks only the rare line that would overflow.
+// line-to-line — no per-line shrinking. A line longer than its box wraps within
+// the page (see RIGHT_LIMIT) instead of shrinking or spilling off the edge.
 const LINE_FONT = "2.6cqh";
 
-// Shrink each positioned line's font until its text fits inside its box width.
-// lineFont() sizes from box *height* only, and lines use white-space:nowrap, so
-// long lines (whose true cursive width the server can't know) overflow the page
-// right edge. We measure in the browser after the web-font loads and on resize,
-// scaling font-size down by the overflow ratio (never up past the height-based
-// base). Each line's height-based base is stashed in data-base-font.
-function fitLinesToWidth(container: HTMLElement) {
-  const lines = container.querySelectorAll<HTMLElement>(".sheet-line-abs");
-  for (const el of lines) {
-    const base = el.dataset.baseFont ?? el.style.fontSize;
-    el.dataset.baseFont = base;
-    el.style.fontSize = base;
-    const overflow = el.scrollWidth - el.clientWidth;
-    if (overflow <= 1 || el.clientWidth === 0) continue;
-    const baseVal = parseFloat(base);
-    const unit = base.replace(/[\d.]/g, "");
-    const ratio = el.clientWidth / el.scrollWidth;
-    el.style.fontSize = `${(baseVal * ratio).toFixed(2)}${unit}`;
-  }
-}
+// Right edge (0–1000) past which line text must not extend. Each line's width is
+// stretched from its left to here so cursive text — wider than the server's box
+// estimate — wraps at the page margin rather than spilling off the page.
+const RIGHT_LIMIT = 965;
 
 // --- Positioned (layout-faithful) rendering -------------------------------
 function PositionedPage({ page, notes = [], onCorrect }: Props) {
@@ -94,21 +78,8 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
   }
   const aspect = page.aspect && page.aspect > 0 ? page.aspect : 1.414;
 
-  const pageRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const el = pageRef.current;
-    if (!el) return;
-    const fit = () => fitLinesToWidth(el);
-    fit();
-    // Re-fit once the cursive web-font swaps in (changes text width).
-    document.fonts?.ready.then(fit);
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [page]);
-
   return (
-    <div ref={pageRef} className="sheet-page" style={{ aspectRatio: String(1 / aspect) }}>
+    <div className="sheet-page" style={{ aspectRatio: String(1 / aspect) }}>
       {/* Pasted diagrams (req 5) */}
       {page.diagrams.map((d, i) => {
         const style = {
@@ -143,6 +114,14 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
           );
         }
         const lineNotes = notesByLine.get(li) ?? [];
+        // Left-aligned lines stretch to the page margin so over-long cursive
+        // wraps there instead of spilling off-page; centred lines keep their own
+        // box width so they stay centred.
+        const boxW = Math.max(2, line.box.xmax - line.box.xmin);
+        const width =
+          line.align === "center"
+            ? boxW
+            : Math.max(boxW, RIGHT_LIMIT - line.box.xmin);
         return (
           <div key={li}>
             <div
@@ -152,7 +131,7 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
               style={{
                 left: pct(line.box.xmin),
                 top: pct(line.box.ymin),
-                width: pct(Math.max(2, line.box.xmax - line.box.xmin)),
+                width: pct(width),
                 fontSize: LINE_FONT,
                 textAlign: line.align,
               }}

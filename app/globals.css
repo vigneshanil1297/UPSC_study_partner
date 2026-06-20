@@ -93,8 +93,11 @@ body {
 /* An absolutely-positioned transcribed line, placed by its box. */
 .sheet-line-abs {
   position: absolute;
-  white-space: nowrap;
-  line-height: 1;
+  /* Wrap over-long lines at the page margin instead of nowrap-spilling off the
+     page; break a stray long word too so nothing ever exceeds the width. */
+  white-space: normal;
+  overflow-wrap: break-word;
+  line-height: 1.15;
   transform: translateY(-12%);
 }
 
