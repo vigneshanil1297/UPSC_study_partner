@@ -1,6 +1,7 @@
 "use client";
 
-import type { Annotation, Box, Line, StructuredPage } from "@/lib/criteria";
+import { useLayoutEffect, useRef } from "react";
+import type { Annotation, Line, StructuredPage } from "@/lib/criteria";
 
 type Props = {
   page: StructuredPage;
@@ -57,12 +58,30 @@ function Runs({
   );
 }
 
-// Font size for a positioned line: scaled to its box height in container-query
-// height units (1cqh = 1% of the page height), clamped to stay legible.
-function lineFont(box: Box): string {
-  const h = ((box.ymax - box.ymin) / 1000) * 100; // in cqh
-  const size = Math.min(6, Math.max(1.7, h * 0.72));
-  return `${size.toFixed(2)}cqh`;
+// One standard font size for all transcribed lines, in container-query height
+// units (1cqh = 1% of page height) so it scales with the page but stays uniform
+// line-to-line. fitLinesToWidth() shrinks only the rare line that would overflow.
+const LINE_FONT = "2.6cqh";
+
+// Shrink each positioned line's font until its text fits inside its box width.
+// lineFont() sizes from box *height* only, and lines use white-space:nowrap, so
+// long lines (whose true cursive width the server can't know) overflow the page
+// right edge. We measure in the browser after the web-font loads and on resize,
+// scaling font-size down by the overflow ratio (never up past the height-based
+// base). Each line's height-based base is stashed in data-base-font.
+function fitLinesToWidth(container: HTMLElement) {
+  const lines = container.querySelectorAll<HTMLElement>(".sheet-line-abs");
+  for (const el of lines) {
+    const base = el.dataset.baseFont ?? el.style.fontSize;
+    el.dataset.baseFont = base;
+    el.style.fontSize = base;
+    const overflow = el.scrollWidth - el.clientWidth;
+    if (overflow <= 1 || el.clientWidth === 0) continue;
+    const baseVal = parseFloat(base);
+    const unit = base.replace(/[\d.]/g, "");
+    const ratio = el.clientWidth / el.scrollWidth;
+    el.style.fontSize = `${(baseVal * ratio).toFixed(2)}${unit}`;
+  }
 }
 
 // --- Positioned (layout-faithful) rendering -------------------------------
@@ -75,8 +94,21 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
   }
   const aspect = page.aspect && page.aspect > 0 ? page.aspect : 1.414;
 
+  const pageRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = pageRef.current;
+    if (!el) return;
+    const fit = () => fitLinesToWidth(el);
+    fit();
+    // Re-fit once the cursive web-font swaps in (changes text width).
+    document.fonts?.ready.then(fit);
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [page]);
+
   return (
-    <div className="sheet-page" style={{ aspectRatio: String(1 / aspect) }}>
+    <div ref={pageRef} className="sheet-page" style={{ aspectRatio: String(1 / aspect) }}>
       {/* Pasted diagrams (req 5) */}
       {page.diagrams.map((d, i) => {
         const style = {
@@ -121,7 +153,7 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
                 left: pct(line.box.xmin),
                 top: pct(line.box.ymin),
                 width: pct(Math.max(2, line.box.xmax - line.box.xmin)),
-                fontSize: lineFont(line.box),
+                fontSize: LINE_FONT,
                 textAlign: line.align,
               }}
             >
