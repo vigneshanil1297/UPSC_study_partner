@@ -5,6 +5,9 @@ import type { Annotation, Box, Line, StructuredPage } from "@/lib/criteria";
 type Props = {
   page: StructuredPage;
   notes?: Annotation[];
+  // "lined" = each transcribed line on its own row, breaking exactly where the
+  // page breaks (never overlaps). "faithful" = lines at their true box x/y.
+  layout?: "lined" | "faithful";
   // Replace a run's text (and clear its uncertain flag) after the user edits it.
   onCorrect: (lineIndex: number, runIndex: number, text: string) => void;
 };
@@ -109,21 +112,38 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
       : pageAspect;
 
   // Pre-pass: normalize every line box into the border rectangle, then walk
-  // top-to-bottom enforcing MIN_LINE_GAP so adjacent lines never overlap.
+  // top-to-bottom enforcing a gap so adjacent lines never overlap. The gap for
+  // a line is MIN_LINE_GAP times its estimated wrapped-row count: a long cursive
+  // line that wraps to 2 visual rows reserves 2 rows of vertical space, so the
+  // next line is pushed below the wrap instead of rendering on top of it.
   const lineBoxes: (Box | null)[] = [];
-  let lastTop = -Infinity;
+  let lastBottom = -Infinity;
   for (const line of page.lines) {
     if (!line.box) {
       lineBoxes.push(null);
       continue;
     }
     const b = normalize(line.box);
-    if (b.ymin < lastTop + MIN_LINE_GAP) {
-      const shift = lastTop + MIN_LINE_GAP - b.ymin;
+    // Rendered glyph height ≈ LINE_FONT (2.6% of page height). Width of one
+    // page-height unit in render px is `aspect` units of page width, so chars
+    // that fit across the line ≈ lineWidthFrac / (charEm * fontFrac * aspect).
+    const widthUnits =
+      line.align === "center"
+        ? Math.max(2, b.xmax - b.xmin)
+        : Math.max(b.xmax - b.xmin, RIGHT_LIMIT - b.xmin);
+    const chars = line.runs.reduce((n, r) => n + r.text.length + 1, 0);
+    // Glyph advance ≈ 0.55em at LINE_FONT; one char ≈ 0.55 * 26 * aspect units
+    // wide. Bias slightly toward fewer chars/row (more rows) so the reserved
+    // gap is never short → no overlap.
+    const charsPerRow = Math.max(1, widthUnits / (14 * aspect));
+    const rows = line.kind === "divider" ? 1 : Math.max(1, Math.ceil(chars / charsPerRow));
+    const gap = MIN_LINE_GAP * rows;
+    if (b.ymin < lastBottom) {
+      const shift = lastBottom - b.ymin;
       b.ymin += shift;
       b.ymax += shift;
     }
-    lastTop = b.ymin;
+    lastBottom = b.ymin + gap;
     lineBoxes.push(b);
   }
 
@@ -205,7 +225,12 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
   );
 }
 
-// --- Fallback flow rendering (old transcripts with no boxes) ----------------
+// --- Lined (accurate line-break) rendering ----------------------------------
+// Each transcribed line is one flow row that breaks exactly where the page
+// breaks. Rows stack top-to-bottom in document flow, so a long line that wraps
+// pushes the next row down instead of rendering on top of it — overlap is
+// impossible. Diagrams are interleaved at their vertical position. The ruled
+// answer-booklet frame (border + red margin + ruling) is drawn around it.
 function FlowPage({ page, notes = [], onCorrect }: Props) {
   const notesByLine = new Map<number, Annotation[]>();
   for (const n of notes) {
@@ -213,18 +238,52 @@ function FlowPage({ page, notes = [], onCorrect }: Props) {
     arr.push(n);
     notesByLine.set(n.lineIndex, arr);
   }
+
+  // Place each diagram after the line index it vertically follows, so diagrams
+  // land roughly where they sit on the page rather than all at the end.
+  const diagramsAfter = new Map<number, typeof page.diagrams>();
+  for (const d of page.diagrams) {
+    let idx = -1;
+    for (let i = 0; i < page.lines.length; i++) {
+      const b = page.lines[i].box;
+      if (b && b.ymin <= d.box.ymin) idx = i;
+    }
+    const arr = diagramsAfter.get(idx) ?? [];
+    arr.push(d);
+    diagramsAfter.set(idx, arr);
+  }
+
+  const renderDiagrams = (idx: number) =>
+    (diagramsAfter.get(idx) ?? []).map((d, i) =>
+      d.png ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={`d${idx}-${i}`} src={d.png} alt={d.caption ?? "diagram"} className="sheet-lined-diagram" />
+      ) : (
+        <div key={`d${idx}-${i}`} className="sheet-lined-diagram-missing">
+          {d.caption ?? "diagram"}
+        </div>
+      ),
+    );
+
   return (
-    <div className="sheet font-hand text-neutral-800">
+    <div className="sheet-lined font-hand text-neutral-800">
+      {renderDiagrams(-1)}
       {page.lines.map((line, li) => {
-        if (line.kind === "divider") return <hr key={li} className="sheet-divider-flow" />;
+        if (line.kind === "divider")
+          return (
+            <div key={li}>
+              <hr className="sheet-divider-flow" />
+              {renderDiagrams(li)}
+            </div>
+          );
         const lineNotes = notesByLine.get(li) ?? [];
+        const indent = line.align === "center" ? "text-center" : line.align === "right" ? "text-right" : "";
         return (
           <div key={li}>
             <div
-              className={`sheet-line ${line.kind === "heading" ? "font-bold" : ""} ${
+              className={`sheet-line-lined ${line.kind === "heading" ? "font-bold" : ""} ${
                 line.underline ? "underline" : ""
-              } ${line.kind === "question-number" ? "text-blue-800" : ""}`}
-              style={{ textAlign: line.align }}
+              } ${line.kind === "question-number" ? "text-blue-800" : ""} ${indent}`}
             >
               <Runs line={line} li={li} onCorrect={onCorrect} />
             </div>
@@ -233,6 +292,7 @@ function FlowPage({ page, notes = [], onCorrect }: Props) {
                 ✎ {n.text}
               </div>
             ))}
+            {renderDiagrams(li)}
           </div>
         );
       })}
@@ -245,12 +305,12 @@ function FlowPage({ page, notes = [], onCorrect }: Props) {
 // positions, alignment, underlines, dividers, pasted diagrams, page frame);
 // older box-less transcripts fall back to the ruled flow layout.
 export default function AnswerSheet(props: Props) {
-  const positioned = props.page.aspect != null && props.page.lines.some((l) => l.box);
-  return positioned ? (
+  const hasBoxes = props.page.aspect != null && props.page.lines.some((l) => l.box);
+  // Faithful needs boxes; default and box-less transcripts use lined flow.
+  const positioned = hasBoxes && (props.layout ?? "lined") === "faithful";
+  return (
     <div className="sheet-frame font-hand text-neutral-800">
-      <PositionedPage {...props} />
+      {positioned ? <PositionedPage {...props} /> : <FlowPage {...props} />}
     </div>
-  ) : (
-    <FlowPage {...props} />
   );
 }

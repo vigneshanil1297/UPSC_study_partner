@@ -45,6 +45,10 @@ export default function Home() {
   const [questionFiles, setQuestionFiles] = useState<File[]>([]);
 
   const [pages, setPages] = useState<StructuredPage[]>([]);
+  // How the digital answer-sheet is drawn. "lined" = each transcribed line on
+  // its own row, breaking exactly where the page breaks (never overlaps).
+  // "faithful" = lines placed at their true x/y box positions on the page.
+  const [layout, setLayout] = useState<"lined" | "faithful">("lined");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [result, setResult] = useState<EvalResult | null>(null);
 
@@ -442,11 +446,26 @@ export default function Home() {
               Highlighted words are uncertain — click to correct before evaluating.
             </span>
           </div>
+          <div className="mt-2 inline-flex rounded-md border border-neutral-300 bg-white p-0.5 text-xs">
+            <button
+              onClick={() => setLayout("lined")}
+              className={`rounded px-2.5 py-1 ${layout === "lined" ? "bg-neutral-900 text-white" : "text-neutral-600"}`}
+            >
+              Accurate line breaks
+            </button>
+            <button
+              onClick={() => setLayout("faithful")}
+              className={`rounded px-2.5 py-1 ${layout === "faithful" ? "bg-neutral-900 text-white" : "text-neutral-600"}`}
+            >
+              Faithful layout
+            </button>
+          </div>
           <div className="mt-3 space-y-6">
             {pages.map((page) => (
               <AnswerSheet
                 key={page.pageNumber}
                 page={page}
+                layout={layout}
                 notes={notesByPage.get(page.pageNumber)}
                 onCorrect={(li, ri, text) => correctRun(page.pageNumber, li, ri, text)}
               />

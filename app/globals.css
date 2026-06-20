@@ -173,3 +173,69 @@ body {
   font-size: 15px;
   line-height: 1.35;
 }
+
+/* --- Lined (accurate line-break) page --------------------------------------
+   Ruled answer-booklet paper, but lines flow top-to-bottom instead of being
+   absolutely positioned, so a wrapped line pushes the next one down and text
+   can never overlap. Line-height is locked to the 36px ruling so every row,
+   wrapped or not, sits on a rule. */
+.sheet-lined {
+  position: relative;
+  background-color: #fffefb;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 35px,
+    #cfe0ee 35px,
+    #cfe0ee 36px
+  );
+  border: 1.5px solid #b9b2a4;
+  border-radius: 4px;
+  outline: 3px solid #fffefb;
+  outline-offset: -7px;
+  box-shadow: inset 0 0 0 1px #d8d2c6;
+  padding: 18px 28px 28px 64px;
+}
+
+/* Red left margin rule of the booklet. */
+.sheet-lined::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 48px;
+  width: 1px;
+  background: #e8a9a9;
+}
+
+/* One transcribed line: its own flow row, wrapping onto further rules. */
+.sheet-line-lined {
+  font-size: 18px;
+  line-height: 36px;
+  min-height: 36px;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* A diagram crop interleaved at its place in the lined flow. */
+.sheet-lined-diagram {
+  display: block;
+  max-width: 100%;
+  margin: 8px 0;
+  object-fit: contain;
+}
+.sheet-lined-diagram-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  margin: 8px 0;
+  border: 1px dashed #b9b2a4;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.02);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  color: #8a8275;
+  text-align: center;
+  padding: 2px;
+}
