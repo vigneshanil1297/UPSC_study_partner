@@ -1,6 +1,6 @@
 "use client";
 
-import type { Annotation, Line, StructuredPage } from "@/lib/criteria";
+import type { Annotation, Box, Line, StructuredPage } from "@/lib/criteria";
 
 type Props = {
   page: StructuredPage;
@@ -68,6 +68,28 @@ const LINE_FONT = "2.6cqh";
 // estimate — wraps at the page margin rather than spilling off the page.
 const RIGHT_LIMIT = 965;
 
+// Minimum vertical gap (0–1000 units) between consecutive lines' tops. The
+// uniform line font is ~LINE_FONT (2.6% of page height ≈ 26 units), so anything
+// closer than this means two lines would render on top of each other. We push
+// later lines down to enforce it — this is what stops words stacking above one
+// another when the model returns near-identical y's for adjacent lines.
+const MIN_LINE_GAP = 30;
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+// Remap a page-coordinate box into the writing-area rectangle. Each axis is
+// rescaled so the contentBox spans the full 0–1000 sheet, which aligns all text
+// to the printed borders and cancels camera skew / binding / margin furniture.
+// No contentBox → identity.
+function makeNormalize(cb: Box | null | undefined) {
+  if (!cb) return (b: Box) => b;
+  const dx = cb.xmax - cb.xmin || 1;
+  const dy = cb.ymax - cb.ymin || 1;
+  const nx = (x: number) => clamp(((x - cb.xmin) / dx) * 1000, 0, 1000);
+  const ny = (y: number) => clamp(((y - cb.ymin) / dy) * 1000, 0, 1000);
+  return (b: Box): Box => ({ xmin: nx(b.xmin), xmax: nx(b.xmax), ymin: ny(b.ymin), ymax: ny(b.ymax) });
+}
+
 // --- Positioned (layout-faithful) rendering -------------------------------
 function PositionedPage({ page, notes = [], onCorrect }: Props) {
   const notesByLine = new Map<number, Annotation[]>();
@@ -76,17 +98,45 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
     arr.push(n);
     notesByLine.set(n.lineIndex, arr);
   }
-  const aspect = page.aspect && page.aspect > 0 ? page.aspect : 1.414;
+  const cb = page.contentBox;
+  const normalize = makeNormalize(cb);
+  // The drawn sheet should have the writing-area's proportions, not the whole
+  // photo's — height/width of the contentBox in real pixels.
+  const pageAspect = page.aspect && page.aspect > 0 ? page.aspect : 1.414;
+  const aspect =
+    cb && cb.xmax > cb.xmin && cb.ymax > cb.ymin
+      ? pageAspect * ((cb.ymax - cb.ymin) / (cb.xmax - cb.xmin))
+      : pageAspect;
+
+  // Pre-pass: normalize every line box into the border rectangle, then walk
+  // top-to-bottom enforcing MIN_LINE_GAP so adjacent lines never overlap.
+  const lineBoxes: (Box | null)[] = [];
+  let lastTop = -Infinity;
+  for (const line of page.lines) {
+    if (!line.box) {
+      lineBoxes.push(null);
+      continue;
+    }
+    const b = normalize(line.box);
+    if (b.ymin < lastTop + MIN_LINE_GAP) {
+      const shift = lastTop + MIN_LINE_GAP - b.ymin;
+      b.ymin += shift;
+      b.ymax += shift;
+    }
+    lastTop = b.ymin;
+    lineBoxes.push(b);
+  }
 
   return (
     <div className="sheet-page" style={{ aspectRatio: String(1 / aspect) }}>
       {/* Pasted diagrams (req 5) */}
       {page.diagrams.map((d, i) => {
+        const b = normalize(d.box);
         const style = {
-          left: pct(d.box.xmin),
-          top: pct(d.box.ymin),
-          width: pct(d.box.xmax - d.box.xmin),
-          height: pct(d.box.ymax - d.box.ymin),
+          left: pct(b.xmin),
+          top: pct(b.ymin),
+          width: pct(b.xmax - b.xmin),
+          height: pct(b.ymax - b.ymin),
         };
         return d.png ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -99,16 +149,17 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
       })}
 
       {page.lines.map((line, li) => {
-        if (!line.box) return null;
+        const box = lineBoxes[li];
+        if (!box) return null;
         if (line.kind === "divider") {
           return (
             <div
               key={li}
               className="sheet-divider"
               style={{
-                left: pct(line.box.xmin),
-                top: pct((line.box.ymin + line.box.ymax) / 2),
-                width: pct(Math.max(20, line.box.xmax - line.box.xmin)),
+                left: pct(box.xmin),
+                top: pct((box.ymin + box.ymax) / 2),
+                width: pct(Math.max(20, box.xmax - box.xmin)),
               }}
             />
           );
@@ -117,11 +168,11 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
         // Left-aligned lines stretch to the page margin so over-long cursive
         // wraps there instead of spilling off-page; centred lines keep their own
         // box width so they stay centred.
-        const boxW = Math.max(2, line.box.xmax - line.box.xmin);
+        const boxW = Math.max(2, box.xmax - box.xmin);
         const width =
           line.align === "center"
             ? boxW
-            : Math.max(boxW, RIGHT_LIMIT - line.box.xmin);
+            : Math.max(boxW, RIGHT_LIMIT - box.xmin);
         return (
           <div key={li}>
             <div
@@ -129,8 +180,8 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
                 line.underline ? "underline" : ""
               } ${line.kind === "question-number" ? "text-blue-800" : ""}`}
               style={{
-                left: pct(line.box.xmin),
-                top: pct(line.box.ymin),
+                left: pct(box.xmin),
+                top: pct(box.ymin),
                 width: pct(width),
                 fontSize: LINE_FONT,
                 textAlign: line.align,
@@ -142,7 +193,7 @@ function PositionedPage({ page, notes = [], onCorrect }: Props) {
               <div
                 key={ni}
                 className={`note-abs ${noteColor[n.type]}`}
-                style={{ top: pct(line.box!.ymin), left: pct(Math.min(720, line.box!.xmax + 5)) }}
+                style={{ top: pct(box.ymin), left: pct(Math.min(720, box.xmax + 5)) }}
               >
                 ✎ {n.text}
               </div>

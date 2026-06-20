@@ -105,6 +105,12 @@ export const StructuredPageSchema = z.object({
     .nullable()
     .describe("The answer's question number if this page starts/continues one (e.g. '1', '5(a)'), else null."),
   aspect: z.number().optional().describe("Client-filled: page height / width, for faithful page proportions."),
+  // The writing area inside the printed answer-sheet frame (excludes spiral
+  // binding, the printed UPSC header band, the red left-margin furniture, and
+  // page edges). All line/diagram boxes are remapped into this rectangle at
+  // render time so text aligns to the sheet's borders regardless of camera
+  // angle, skew, or visible binding. Null → boxes used as-is.
+  contentBox: BoxSchema.nullable().default(null).describe("Bounding box (0–1000) of the writing area inside the printed answer-sheet frame, excluding binding, header, margin furniture, and page edges."),
   lines: z.array(LineSchema),
   // Defaulted so transcripts saved before diagram detection still parse.
   diagrams: z.array(DiagramSchema).default([]).describe("Drawn figures on the page, to paste as images."),
