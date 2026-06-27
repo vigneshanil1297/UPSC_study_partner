@@ -2,6 +2,8 @@ import { CRITERIA, isPsir, type EvalMode, type Question, type StructuredPage, ty
 import { GS1_SYLLABUS, PSIR_PAPER1_SYLLABUS, PSIR_PAPER2_SYLLABUS } from "./syllabus";
 import { TOPPER_PLAYBOOK, ESSAY_LENS, PSIR_PLAYBOOK } from "./knowledge-base";
 import { STRUCTURE_BENCHMARK, structureSummary } from "./structure";
+import { directiveNote } from "./directives";
+import { topicGuidance } from "./topic-templates";
 
 // ---------------------------------------------------------------------------
 // Transcription — one PDF page at a time, structured + layout-faithful.
@@ -154,11 +156,25 @@ export function evaluationUser(
   subject: Subject = "gs1",
 ): string {
   const piece = mode === "essay" && !isPsir(subject) ? "essay" : "answer";
+  // Each question carries its DIRECTIVE rubric inline (reusable across unseen
+  // wordings — directives recur even though questions don't), so the model
+  // checks directive compliance against an explicit checklist.
   const qBlock = questions.length
     ? questions
-        .map((q) => `Q${q.number}${q.marks ? ` (${q.marks} marks)` : ""}: ${q.text}`)
+        .map((q) => {
+          const dir = mode === "essay" && !isPsir(subject) ? "" : directiveNote(q.text);
+          return `Q${q.number}${q.marks ? ` (${q.marks} marks)` : ""}: ${q.text}${dir ? `\n  ${dir}` : ""}`;
+        })
         .join("\n")
     : "(no question paper provided — infer each answer's demand from its content and any written question number)";
+
+  // Topic-level dimension guidance, matched on the combined question text. Soft
+  // guidance on the canonical angles a strong answer to this theme covers. Only
+  // for analytical (non-essay) papers; essays are judged on flow, not coverage.
+  const topicBlock =
+    mode === "essay" && !isPsir(subject)
+      ? ""
+      : topicGuidance(questions.map((q) => q.text).join(" "), subject);
 
   // Per-answer structure figures (point count + intro/body/conclusion spatial
   // ratio) grouped by question number, for the model's "structure_note".
@@ -177,7 +193,7 @@ export function evaluationUser(
 
   return `QUESTION PAPER:
 ${qBlock}
-
+${topicBlock ? `\n${topicBlock}\n` : ""}
 CANDIDATE'S ANSWER BOOKLET (lines tagged [p<page>:l<line>] — anchor inline_notes to these):
 ${renderPagesForEval(pages)}
 ${structureBlock ? `\nSTRUCTURE (for "structure_note", compare to topper benchmark):\n${structureBlock}\n` : ""}
