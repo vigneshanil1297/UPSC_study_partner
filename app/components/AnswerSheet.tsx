@@ -180,21 +180,10 @@ function FlowPage({ page, notes = [], onCorrect }: Props) {
     if (bigGap && (structural || endsSentence(textLines[k - 1].l))) paraBreak.add(cur.i);
   }
 
-  // Horizontal indent is reproduced from each line's own box.xmin relative to
-  // the column's left edge — this faithfully recreates the page's dash sub-
-  // points and the indented continuation lines beneath a point. Quantised into
-  // discrete steps so small coordinate jitter doesn't make aligned lines wobble.
-  const lefts = page.lines
-    .filter((l) => l.box && l.align !== "center" && l.align !== "right" && l.kind !== "divider")
-    .map((l) => l.box!.xmin);
-  const leftEdge = lefts.length ? Math.min(...lefts) : 0;
-  const STEP = 32; // 0–1000 page units per indent level
-  const indentEm = (line: Line): number => {
-    if (!line.box || line.align === "center" || line.align === "right") return 0;
-    const off = line.box.xmin - leftEdge;
-    if (off < STEP * 0.6) return 0; // at the margin
-    return Math.min(4, Math.round(off / STEP)) * 1.4; // 1.4em per level, capped
-  };
+  // Horizontal indent is NOT taken from per-line box.xmin: on cursive script the
+  // model's bounding boxes jitter (tall/capital first letters widen xmin), so
+  // xmin-based indent scattered spurious indents across visually-aligned lines.
+  // Indent is now structural only — a fixed hanging indent for dash sub-points.
 
   // 3-column grid (margin | content | right margin) shared by the header and
   // body rows so the vertical rules run continuously top-to-bottom; the outer
@@ -214,44 +203,117 @@ function FlowPage({ page, notes = [], onCorrect }: Props) {
       </div>
       <div className="booklet-cell booklet-c2 booklet-content font-hand">
         {renderDiagrams(-1)}
-        {page.lines.map((line, li) => {
-          if (line.kind === "question-number") return renderDiagrams(li);
-          if (line.kind === "divider")
-            return (
-              <div key={li}>
-                <hr className="booklet-divider" />
-                {renderDiagrams(li)}
-              </div>
+        {(() => {
+          // Reflow: consecutive body lines flow into one paragraph block. The
+          // model splits text at handwriting line positions; emitting one div per
+          // source line mirrored that wrap (choppy short lines). We instead merge
+          // wrapped continuation lines and only break at real structure: a numbered
+          // point, a dash sub-point, a heading, a centered/right line, or a real
+          // blank-line paragraph gap (paraBreak). Each source line stays an inline
+          // span so its own underline/heading weight and per-run editing survive.
+          const out: React.ReactNode[] = [];
+          let cur:
+            | {
+                key: number;
+                spaced: boolean;
+                align: string;
+                pad: number;
+                lines: React.ReactNode[];
+                extras: React.ReactNode[];
+              }
+            | null = null;
+          let forceBreakNext = false;
+
+          const flush = () => {
+            if (!cur) return;
+            const c = cur;
+            out.push(
+              <div key={`b${c.key}`}>
+                <div
+                  className={`booklet-line ${c.spaced ? "booklet-block" : ""} ${c.align}`}
+                  style={c.pad ? { paddingLeft: `${c.pad}em` } : undefined}
+                >
+                  {c.lines}
+                </div>
+                {c.extras}
+              </div>,
             );
-          const lineNotes = notesByLine.get(li) ?? [];
-          const align =
-            line.align === "center" ? "text-center" : line.align === "right" ? "text-right" : "";
-          // Spacing: a fresh block before a numbered point, a dash sub-point, a
-          // heading, or a real blank-line paragraph break.
-          const spaced =
-            startsListItem(line) || startsDash(line) || line.kind === "heading" || paraBreak.has(li)
-              ? "booklet-block"
-              : "";
-          const pad = align === "" ? indentEm(line) : 0;
-          return (
-            <div key={li}>
-              <div
-                className={`booklet-line ${spaced} ${
-                  line.kind === "heading" ? "font-semibold" : ""
-                } ${line.underline ? "underline" : ""} ${align}`}
-                style={pad ? { paddingLeft: `${pad}em` } : undefined}
+            cur = null;
+          };
+
+          page.lines.forEach((line, li) => {
+            if (line.kind === "question-number") {
+              flush();
+              const d = renderDiagrams(li);
+              if (d.length) out.push(<div key={`q${li}`}>{d}</div>);
+              forceBreakNext = true;
+              return;
+            }
+            if (line.kind === "divider") {
+              flush();
+              out.push(
+                <div key={`hr${li}`}>
+                  <hr className="booklet-divider" />
+                  {renderDiagrams(li)}
+                </div>,
+              );
+              forceBreakNext = true;
+              return;
+            }
+
+            const isHeading = line.kind === "heading";
+            const align =
+              line.align === "center" ? "text-center" : line.align === "right" ? "text-right" : "";
+            const standalone = isHeading || align !== "";
+            const newBlock =
+              !cur ||
+              forceBreakNext ||
+              standalone ||
+              startsListItem(line) ||
+              startsDash(line) ||
+              paraBreak.has(li);
+
+            if (newBlock) {
+              flush();
+              cur = {
+                key: li,
+                spaced:
+                  startsListItem(line) || startsDash(line) || isHeading || paraBreak.has(li),
+                align,
+                pad: startsDash(line) ? 1.4 : 0,
+                lines: [],
+                extras: [],
+              };
+            }
+
+            cur!.lines.push(
+              <span
+                key={`l${li}`}
+                className={`${isHeading ? "font-semibold" : ""} ${
+                  line.underline ? "underline" : ""
+                }`}
               >
                 <Runs line={line} li={li} onCorrect={onCorrect} />
-              </div>
-              {lineNotes.map((n, ni) => (
-                <div key={ni} className={`note-hand ${noteColor[n.type]} pl-2`}>
+              </span>,
+            );
+
+            const lineNotes = notesByLine.get(li) ?? [];
+            lineNotes.forEach((n, ni) =>
+              cur!.extras.push(
+                <div key={`n${li}-${ni}`} className={`note-hand ${noteColor[n.type]} pl-2`}>
                   ✎ {n.text}
-                </div>
-              ))}
-              {renderDiagrams(li)}
-            </div>
-          );
-        })}
+                </div>,
+              ),
+            );
+            const d = renderDiagrams(li);
+            if (d.length) cur!.extras.push(<div key={`d${li}`}>{d}</div>);
+
+            // A heading/centered line is single-line: force the next line fresh.
+            forceBreakNext = standalone;
+          });
+          flush();
+          return out;
+        })()}
       </div>
       <div className="booklet-cell booklet-c3" />
     </div>
