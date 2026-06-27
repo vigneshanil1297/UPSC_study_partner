@@ -45,3 +45,7 @@ create policy "own read" on public.evaluations
 drop policy if exists "own insert" on public.evaluations;
 create policy "own insert" on public.evaluations
   for insert with check (auth.uid() = user_id);
+
+drop policy if exists "own delete" on public.evaluations;
+create policy "own delete" on public.evaluations
+  for delete using (auth.uid() = user_id);

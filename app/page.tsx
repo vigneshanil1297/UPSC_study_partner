@@ -23,6 +23,7 @@ import {
   getAccessToken,
   fetchHistory,
   saveEvaluation,
+  deleteEvaluation,
   type EvalRecord,
 } from "@/lib/supabase";
 
@@ -120,6 +121,19 @@ export default function Home() {
     setResult(r.result);
     setTopic(r.topic);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function removeRecord(r: EvalRecord) {
+    if (typeof window !== "undefined" && !window.confirm(`Delete "${r.topic || "(untitled)"}"?`)) {
+      return;
+    }
+    setHistory((h) => h.filter((x) => x.id !== r.id));
+    try {
+      await deleteEvaluation(r.id);
+    } catch {
+      // Restore on failure so the list reflects reality.
+      setHistory(await fetchHistory());
+    }
   }
 
   // Notes grouped by page, so each AnswerSheet only gets its own annotations.
@@ -480,7 +494,7 @@ export default function Home() {
       )}
 
       {/* Per-answer evaluation */}
-      {result && (
+      {result && result.answers && (
         <section id="evaluations" className="mt-10">
           <h2 className="text-lg font-bold">Evaluation</h2>
           <p className="mt-1 text-xs text-neutral-500">
@@ -520,10 +534,10 @@ export default function Home() {
 
           <ul className="mt-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
             {history.map((r) => (
-              <li key={r.id}>
+              <li key={r.id} className="flex items-center hover:bg-neutral-50">
                 <button
                   onClick={() => viewRecord(r)}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-neutral-50"
+                  className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left"
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium text-neutral-800">
@@ -539,6 +553,14 @@ export default function Home() {
                     </span>
                   </span>
                   <span className="shrink-0 font-bold text-neutral-800">{r.overall_score}/100</span>
+                </button>
+                <button
+                  onClick={() => removeRecord(r)}
+                  aria-label="Delete evaluation"
+                  title="Delete"
+                  className="shrink-0 px-3 py-3 text-neutral-400 hover:text-red-600"
+                >
+                  ✕
                 </button>
               </li>
             ))}

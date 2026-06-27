@@ -69,6 +69,12 @@ export async function fetchHistory(limit = 20): Promise<EvalRecord[]> {
   return (data ?? []) as EvalRecord[];
 }
 
+export async function deleteEvaluation(id: string): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.from("evaluations").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // --- Auth (Google sign-in) ---
 // The browser client persists the session and handles the OAuth redirect
 // automatically (detectSessionInUrl default). Server-side API routes verify
