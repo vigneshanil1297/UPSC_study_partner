@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type {
-  Annotation,
-  EvalMode,
-  EvalResult,
-  Question,
-  StructuredPage,
+import {
+  SUBJECTS,
+  isPsir,
+  type Annotation,
+  type EvalMode,
+  type EvalResult,
+  type Question,
+  type StructuredPage,
+  type Subject,
 } from "@/lib/criteria";
 import { renderPdfToImages, cropDiagramToPng, type ImageInput, type RenderedPage } from "@/lib/pdf";
 import { computeStructure } from "@/lib/structure";
@@ -45,8 +48,12 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T, index: num
 const DEV_NO_AUTH = process.env.NEXT_PUBLIC_DEV_NO_AUTH === "1";
 
 export default function Home() {
+  const [subject, setSubject] = useState<Subject>("gs1");
   const [mode, setMode] = useState<EvalMode>("gs");
   const [topic, setTopic] = useState("");
+  // PSIR is always analytical; the essay/gs toggle only applies to GS Paper I.
+  const psir = isPsir(subject);
+  const effectiveMode: EvalMode = psir ? "gs" : mode;
   const [answerFiles, setAnswerFiles] = useState<File[]>([]);
   const [questionFiles, setQuestionFiles] = useState<File[]>([]);
 
@@ -260,7 +267,7 @@ export default function Home() {
       const res = await fetch("/api/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
-        body: JSON.stringify({ mode, questions: effectiveQuestions, pages: leanPages }),
+        body: JSON.stringify({ mode: effectiveMode, subject, questions: effectiveQuestions, pages: leanPages }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Evaluation failed.");
@@ -268,7 +275,7 @@ export default function Home() {
       setResult(evalResult);
       if (historyEnabled && !DEV_NO_AUTH) {
         const title = effectiveQuestions[0]?.text ?? topic.trim();
-        saveEvaluation({ mode, title, questions: effectiveQuestions, pages, result: evalResult })
+        saveEvaluation({ mode: effectiveMode, title, questions: effectiveQuestions, pages, result: evalResult })
           .then(refreshHistory)
           .catch(() => {});
       }
@@ -348,23 +355,48 @@ export default function Home() {
         </div>
       )}
 
-      {/* Mode toggle */}
+      {/* Paper / subject selector */}
       <section className="mt-8">
-        <label className="block text-sm font-semibold">Evaluation mode</label>
+        <label className="block text-sm font-semibold">Paper</label>
         <div className="mt-1 inline-flex rounded-md border border-neutral-300 bg-white p-0.5">
-          {(["gs", "essay"] as const).map((m) => (
+          {SUBJECTS.map((s) => (
             <button
-              key={m}
-              onClick={() => setMode(m)}
+              key={s.key}
+              onClick={() => setSubject(s.key)}
               className={`rounded px-4 py-1.5 text-sm font-medium transition ${
-                mode === m ? "bg-neutral-900 text-white" : "text-neutral-600 hover:text-neutral-900"
+                subject === s.key ? "bg-neutral-900 text-white" : "text-neutral-600 hover:text-neutral-900"
               }`}
             >
-              {m === "essay" ? "Essay paper" : "GS answer"}
+              {s.label}
             </button>
           ))}
         </div>
+        {psir && (
+          <p className="mt-1 text-xs text-neutral-500">
+            PSIR optional — answers marked against the PSIR syllabus & thinker/debate playbook.
+          </p>
+        )}
       </section>
+
+      {/* Mode toggle — only GS Paper I has the essay vs answer choice */}
+      {!psir && (
+        <section className="mt-6">
+          <label className="block text-sm font-semibold">Evaluation mode</label>
+          <div className="mt-1 inline-flex rounded-md border border-neutral-300 bg-white p-0.5">
+            {(["gs", "essay"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`rounded px-4 py-1.5 text-sm font-medium transition ${
+                  mode === m ? "bg-neutral-900 text-white" : "text-neutral-600 hover:text-neutral-900"
+                }`}
+              >
+                {m === "essay" ? "Essay paper" : "GS answer"}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Uploads */}
       <section className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -400,15 +432,17 @@ export default function Home() {
       {questionFiles.length === 0 && (
         <section className="mt-4">
           <label className="block text-sm font-semibold">
-            {mode === "essay" ? "Essay topic (optional)" : "Question (optional)"}
+            {effectiveMode === "essay" ? "Essay topic (optional)" : "Question (optional)"}
           </label>
           <input
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder={
-              mode === "essay"
+              effectiveMode === "essay"
                 ? "e.g. Forests are the best case studies for economic excellence"
-                : "e.g. Evaluate the role of subsidiary alliance in expanding British control in India."
+                : psir
+                  ? "e.g. Critically examine Rawls's theory of justice and its communitarian critiques."
+                  : "e.g. Evaluate the role of subsidiary alliance in expanding British control in India."
             }
             className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
           />

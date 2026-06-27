@@ -1,6 +1,6 @@
-import { CRITERIA, type EvalMode, type Question, type StructuredPage } from "./criteria";
-import { GS1_SYLLABUS } from "./syllabus";
-import { TOPPER_PLAYBOOK, ESSAY_LENS } from "./knowledge-base";
+import { CRITERIA, isPsir, type EvalMode, type Question, type StructuredPage, type Subject } from "./criteria";
+import { GS1_SYLLABUS, PSIR_PAPER1_SYLLABUS, PSIR_PAPER2_SYLLABUS } from "./syllabus";
+import { TOPPER_PLAYBOOK, ESSAY_LENS, PSIR_PLAYBOOK } from "./knowledge-base";
 import { STRUCTURE_BENCHMARK, structureSummary } from "./structure";
 
 // ---------------------------------------------------------------------------
@@ -72,15 +72,33 @@ function renderPagesForEval(pages: StructuredPage[]): string {
 
 // Static, reusable system prompt — cache this prefix. Syllabus + criteria +
 // playbook/lens rarely change, so they belong before the volatile answer text.
-export function evaluationSystem(exemplars: string, mode: EvalMode): string {
-  const examiner =
-    mode === "essay"
+export function evaluationSystem(exemplars: string, mode: EvalMode, subject: Subject = "gs1"): string {
+  const psir = isPsir(subject);
+  const examiner = psir
+    ? "UPSC Mains Political Science & International Relations (PSIR optional) examiner"
+    : mode === "essay"
       ? "UPSC Mains Essay-paper examiner"
       : "UPSC Mains General Studies (GS) answer examiner";
-  const piece = mode === "essay" ? "essay" : "answer";
+  const piece = mode === "essay" && !psir ? "essay" : "answer";
 
-  const lensBlock =
-    mode === "essay"
+  // Syllabus block: the right paper's official wording.
+  const syllabusLabel = psir
+    ? subject === "psir1"
+      ? "PSIR Paper I syllabus"
+      : "PSIR Paper II syllabus"
+    : "GS1 syllabus";
+  const syllabusText = psir
+    ? subject === "psir1"
+      ? PSIR_PAPER1_SYLLABUS
+      : PSIR_PAPER2_SYLLABUS
+    : GS1_SYLLABUS;
+
+  const lensBlock = psir
+    ? `You are evaluating PSIR (optional-paper) analytical answers (10/15/20-mark questions). Apply the topper playbook's presentation guidance in full — clear sub-headings, numbered points, underlining of key terms/thinkers, and directive compliance are STRENGTHS to reward; flowing essay-style prose with no structure scores poorly. CRUCIALLY, also apply the PSIR lens below: this is an OPTIONAL paper graded on command of THINKERS, THEORETICAL DEBATES and SCHOOLS, not on schemes/data/diagrams:
+<psir_lens>
+${PSIR_PLAYBOOK}
+</psir_lens>`
+    : mode === "essay"
       ? `You are evaluating ESSAY-paper writing. The lens below is essay-specific and OVERRIDES the playbook wherever they conflict — essays are flowing prose, so treat bullet points / sub-headings / diagrams as a weakness here, not a strength:
 <essay_lens>
 ${ESSAY_LENS}
@@ -106,10 +124,10 @@ Reference standard — evaluate against top-ranking candidates, using:
 Dimensions to weigh:
 ${criteriaBlock}
 
-GS1 syllabus (judge relevance + name the area(s) touched):
-<gs1_syllabus>
-${GS1_SYLLABUS}
-</gs1_syllabus>
+${syllabusLabel} (judge relevance + name the area(s) touched):
+<syllabus>
+${syllabusText}
+</syllabus>
 
 This knowledge base is distilled from real UPSC topper answer copies — the standard you judge against:
 <topper_playbook>
@@ -132,8 +150,9 @@ export function evaluationUser(
   questions: Question[],
   pages: StructuredPage[],
   mode: EvalMode,
+  subject: Subject = "gs1",
 ): string {
-  const piece = mode === "essay" ? "essay" : "answer";
+  const piece = mode === "essay" && !isPsir(subject) ? "essay" : "answer";
   const qBlock = questions.length
     ? questions
         .map((q) => `Q${q.number}${q.marks ? ` (${q.marks} marks)` : ""}: ${q.text}`)
@@ -162,5 +181,11 @@ CANDIDATE'S ANSWER BOOKLET (lines tagged [p<page>:l<line>] — anchor inline_not
 ${renderPagesForEval(pages)}
 ${structureBlock ? `\nSTRUCTURE (for "structure_note", compare to topper benchmark):\n${structureBlock}\n` : ""}
 
-Produce one evaluation object per answered question, correlating answers to questions by question number where possible. Treat the whole thing as ${mode === "essay" ? "an essay" : "GS answers"}.`;
+Produce one evaluation object per answered question, correlating answers to questions by question number where possible. Treat the whole thing as ${
+    isPsir(subject)
+      ? `PSIR optional-paper answers (${subject === "psir1" ? "Paper I" : "Paper II"})`
+      : mode === "essay"
+        ? "an essay"
+        : "GS answers"
+  }.`;
 }
