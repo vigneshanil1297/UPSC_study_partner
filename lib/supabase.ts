@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { EvalMode, EvalResult, Question, StructuredPage } from "./criteria";
+import type { EvalMode, EvalResult, Question, StructuredPage, Subject } from "./criteria";
 
 // Client-side Supabase, used only for saving + listing evaluation history.
 // The publishable (anon) key is safe to expose to the browser; row access is
@@ -21,6 +21,7 @@ export type EvalRecord = {
   id: string;
   created_at: string;
   mode: EvalMode;
+  subject: Subject;
   topic: string;
   overall_score: number;
   questions: Question[];
@@ -38,6 +39,7 @@ export function overallPercent(result: EvalResult): number {
 
 export async function saveEvaluation(input: {
   mode: EvalMode;
+  subject: Subject;
   title: string;
   questions: Question[];
   pages: StructuredPage[];
@@ -46,6 +48,7 @@ export async function saveEvaluation(input: {
   if (!supabase) return;
   const { error } = await supabase.from("evaluations").insert({
     mode: input.mode,
+    subject: input.subject,
     topic: input.title,
     overall_score: overallPercent(input.result),
     questions: input.questions,
@@ -59,7 +62,7 @@ export async function fetchHistory(limit = 20): Promise<EvalRecord[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("evaluations")
-    .select("id, created_at, mode, topic, overall_score, questions, pages, result")
+    .select("id, created_at, mode, subject, topic, overall_score, questions, pages, result")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw new Error(error.message);
