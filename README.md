@@ -16,7 +16,9 @@ The two-step split (transcribe, then evaluate) lets you fix handwriting
 mis-reads before scoring. The Gemini API key lives only in server routes
 (`app/api/*`) — it is never exposed to the browser.
 
-**Cost:** uses Gemini's free tier (`gemini-2.5-flash`). A free key from
+**Cost:** uses Gemini's free tier. Transcription and question extraction run on
+`gemini-3.1-flash-lite` (high daily quota); the single evaluation call uses
+`gemini-3.5-flash`. A free key from
 [aistudio.google.com/apikey](https://aistudio.google.com/apikey) needs **no
 billing**. Free-tier rate limits are generous for one person's study use; if you
 hit them, requests are throttled, not charged.
@@ -69,8 +71,9 @@ Open http://localhost:3000.
 
 - Evaluation uses Gemini structured-output (`responseSchema`); the JSON is then
   re-validated against the Zod schema in `lib/criteria.ts` before display.
-- Model is set in `lib/gemini.ts` (`MODEL`). Swap to another Gemini model there
-  if you want a different quality/quota tradeoff.
+- Models are set in `lib/gemini.ts` (`MODEL_TRANSCRIBE`, `MODEL_EXTRACT`,
+  `MODEL_EVALUATE`). Swap any for another Gemini model there if you want a
+  different quality/quota tradeoff.
 
 ## Roadmap
 
