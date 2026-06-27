@@ -110,6 +110,13 @@ export default function DemandChecklist({
         </div>
       )}
 
+      {ev.diagram_note && (
+        <div className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Diagram</h4>
+          <p className="mt-2 text-sm italic text-neutral-600">{ev.diagram_note}</p>
+        </div>
+      )}
+
       {ev.demands.length > 0 && (
         <div className="mt-3">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">

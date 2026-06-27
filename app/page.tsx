@@ -11,7 +11,7 @@ import {
   type StructuredPage,
   type Subject,
 } from "@/lib/criteria";
-import { renderPdfToImages, cropDiagramToPng, type ImageInput, type RenderedPage } from "@/lib/pdf";
+import { renderPdfToImages, cropDiagramToPng, downscaleDataUrl, type ImageInput, type RenderedPage } from "@/lib/pdf";
 import { computeStructure } from "@/lib/structure";
 import AnswerSheet from "@/app/components/AnswerSheet";
 import DemandChecklist from "@/app/components/DemandChecklist";
@@ -270,18 +270,34 @@ export default function Home() {
           ? questions
           : [{ number: "1", text: topic.trim(), marks: null }];
 
-      // Strip the (large, base64) diagram PNGs — the evaluator only needs the
-      // text/structure, and they'd bloat the request body past Vercel's cap.
+      // Strip the (large, base64) diagram PNGs out of the page payload — the
+      // text/structure path doesn't need them, and they'd bloat the body. The
+      // crops are sent separately, capped + downscaled, for visual evaluation.
       const leanPages = pages.map((p) => ({
         ...p,
         diagrams: p.diagrams.map((d) => ({ box: d.box, caption: d.caption })),
       }));
 
+      // Collect the drawn diagrams (those that cropped successfully), cap the
+      // count, and downscale each so the request stays under Vercel's body cap.
+      const MAX_EVAL_DIAGRAMS = 6;
+      const rawDiagrams = pages.flatMap((p) =>
+        p.diagrams
+          .filter((d) => d.png)
+          .map((d) => ({ page: p.pageNumber, questionNumber: p.questionNumber, caption: d.caption, png: d.png! })),
+      );
+      const diagrams = await Promise.all(
+        rawDiagrams.slice(0, MAX_EVAL_DIAGRAMS).map(async (d) => ({
+          ...d,
+          png: await downscaleDataUrl(d.png),
+        })),
+      );
+
       const token = await getAccessToken();
       const res = await fetch("/api/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
-        body: JSON.stringify({ mode: effectiveMode, subject, questions: effectiveQuestions, pages: leanPages }),
+        body: JSON.stringify({ mode: effectiveMode, subject, questions: effectiveQuestions, pages: leanPages, diagrams }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Evaluation failed.");

@@ -178,6 +178,10 @@ export const AnswerEvaluationSchema = z.object({
     .string()
     .nullable()
     .describe("One examiner remark on how the answer's number of points and intro/body/conclusion spatial balance compares to the topper benchmark."),
+  diagram_note: z
+    .string()
+    .nullable()
+    .describe("One examiner remark on the answer's diagram(s) — aptness, labelling, and whether one was drawn / would have helped where the question warranted it. Null when diagrams are neither present nor expected."),
   inline_notes: z.array(AnnotationSchema).describe("Red margin notes anchored to page+line."),
 });
 export type AnswerEvaluation = z.infer<typeof AnswerEvaluationSchema>;
