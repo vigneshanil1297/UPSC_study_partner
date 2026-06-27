@@ -38,6 +38,12 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T, index: num
   return out;
 }
 
+// Local-dev escape hatch: with NEXT_PUBLIC_DEV_NO_AUTH=1 the Google sign-in
+// wall is skipped so you can use the app without OAuth. The server mirrors this
+// (lib/auth-server.ts) and both sides additionally require a non-production
+// build, so this can never open up the deployed app.
+const DEV_NO_AUTH = process.env.NEXT_PUBLIC_DEV_NO_AUTH === "1";
+
 export default function Home() {
   const [mode, setMode] = useState<EvalMode>("gs");
   const [topic, setTopic] = useState("");
@@ -45,10 +51,6 @@ export default function Home() {
   const [questionFiles, setQuestionFiles] = useState<File[]>([]);
 
   const [pages, setPages] = useState<StructuredPage[]>([]);
-  // How the digital answer-sheet is drawn. "lined" = each transcribed line on
-  // its own row, breaking exactly where the page breaks (never overlaps).
-  // "faithful" = lines placed at their true x/y box positions on the page.
-  const [layout, setLayout] = useState<"lined" | "faithful">("lined");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [result, setResult] = useState<EvalResult | null>(null);
 
@@ -264,7 +266,7 @@ export default function Home() {
       if (!res.ok) throw new Error(json.error ?? "Evaluation failed.");
       const evalResult = json.result as EvalResult;
       setResult(evalResult);
-      if (historyEnabled) {
+      if (historyEnabled && !DEV_NO_AUTH) {
         const title = effectiveQuestions[0]?.text ?? topic.trim();
         saveEvaluation({ mode, title, questions: effectiveQuestions, pages, result: evalResult })
           .then(refreshHistory)
@@ -284,7 +286,7 @@ export default function Home() {
     return <main className="mx-auto max-w-3xl px-5 py-10 text-sm text-neutral-500">Loading…</main>;
   }
 
-  if (historyEnabled && !user) {
+  if (historyEnabled && !user && !DEV_NO_AUTH) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-5 text-center">
         <h1 className="text-2xl font-bold">UPSC Mains Essay Evaluator</h1>
@@ -301,7 +303,7 @@ export default function Home() {
     );
   }
 
-  if (historyEnabled && user && authorized !== true) {
+  if (historyEnabled && user && authorized !== true && !DEV_NO_AUTH) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-5 text-center">
         {authorized === null ? (
@@ -446,26 +448,11 @@ export default function Home() {
               Highlighted words are uncertain — click to correct before evaluating.
             </span>
           </div>
-          <div className="mt-2 inline-flex rounded-md border border-neutral-300 bg-white p-0.5 text-xs">
-            <button
-              onClick={() => setLayout("lined")}
-              className={`rounded px-2.5 py-1 ${layout === "lined" ? "bg-neutral-900 text-white" : "text-neutral-600"}`}
-            >
-              Accurate line breaks
-            </button>
-            <button
-              onClick={() => setLayout("faithful")}
-              className={`rounded px-2.5 py-1 ${layout === "faithful" ? "bg-neutral-900 text-white" : "text-neutral-600"}`}
-            >
-              Faithful layout
-            </button>
-          </div>
           <div className="mt-3 space-y-6">
             {pages.map((page) => (
               <AnswerSheet
                 key={page.pageNumber}
                 page={page}
-                layout={layout}
                 notes={notesByPage.get(page.pageNumber)}
                 onCorrect={(li, ri, text) => correctRun(page.pageNumber, li, ri, text)}
               />

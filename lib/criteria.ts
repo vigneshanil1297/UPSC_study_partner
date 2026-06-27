@@ -68,6 +68,8 @@ export const RunSchema = z.object({
   uncertain: z.boolean().describe("True if the OCR was unsure of this word/phrase."),
   // Defaulted so transcripts saved before per-run underlining still parse.
   underline: z.boolean().default(false).describe("True if this specific word/phrase is underlined on the page."),
+  // Defaulted so older transcripts still parse.
+  strike: z.boolean().default(false).describe("True if this word/phrase is struck out / crossed out on the page."),
 });
 export type Run = z.infer<typeof RunSchema>;
 

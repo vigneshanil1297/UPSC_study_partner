@@ -14,9 +14,17 @@ const ALLOWED = (process.env.ALLOWED_EMAILS ?? "")
 
 export type AuthedUser = { id: string; email: string };
 
+// Local-dev escape hatch: skip Google sign-in entirely. Gated on a non-prod
+// build AND an explicit flag, so the deployed app is never affected even if the
+// env var leaks. Mirrors NEXT_PUBLIC_DEV_NO_AUTH on the client (app/page.tsx).
+const DEV_NO_AUTH =
+  process.env.NODE_ENV !== "production" &&
+  (process.env.NEXT_PUBLIC_DEV_NO_AUTH === "1" || process.env.DEV_NO_AUTH === "1");
+
 // Returns the authenticated, allowlisted user, or null to reject. Fails closed:
 // if Supabase env or the allowlist is missing, no one gets in.
 export async function requireUser(req: Request): Promise<AuthedUser | null> {
+  if (DEV_NO_AUTH) return { id: "dev-user", email: "dev@localhost" };
   if (!url || !key || ALLOWED.length === 0) return null;
 
   const header = req.headers.get("authorization") ?? "";

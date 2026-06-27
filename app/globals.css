@@ -174,62 +174,116 @@ body {
   line-height: 1.35;
 }
 
-/* --- Lined (accurate line-break) page --------------------------------------
-   Ruled answer-booklet paper, but lines flow top-to-bottom instead of being
-   absolutely positioned, so a wrapped line pushes the next one down and text
-   can never overlap. Line-height is locked to the 36px ruling so every row,
-   wrapped or not, sits on a rule. */
-.sheet-lined {
-  position: relative;
-  background-color: #fffefb;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 35px,
-    #cfe0ee 35px,
-    #cfe0ee 36px
-  );
-  border: 1.5px solid #b9b2a4;
-  border-radius: 4px;
-  outline: 3px solid #fffefb;
-  outline-offset: -7px;
-  box-shadow: inset 0 0 0 1px #d8d2c6;
-  padding: 18px 28px 28px 64px;
+/* --- Clean printed-booklet page --------------------------------------------
+   The transcript reflowed as a typed UPSC answer booklet: a bordered sheet with
+   a "UPSC" header band, a narrow left margin column for the circled question
+   number, and a clean printed content column. Lines flow top-to-bottom so a
+   wrapped line pushes the next down — overlap is impossible. */
+.booklet {
+  display: grid;
+  /* Left and right margin columns are equal width. */
+  grid-template-columns: 12% 1fr 12%;
+  max-width: 780px;
+  margin: 0 auto;
+  background: #fffefb;
+  border: 1.5px solid #2b2b2b;
+  border-radius: 2px;
 }
 
-/* Red left margin rule of the booklet. */
-.sheet-lined::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 48px;
-  width: 1px;
-  background: #e8a9a9;
+/* Continuous vertical rules: every col-1 and col-2 cell carries its right
+   border, so the two rules run unbroken through the header and body rows. */
+.booklet-c1,
+.booklet-c2 {
+  border-right: 1.5px solid #2b2b2b;
+}
+/* Header row cells share a bottom rule under the "UPSC" band. */
+.booklet-hrow {
+  min-height: 84px;
+  border-bottom: 1.5px solid #2b2b2b;
+}
+.booklet-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.booklet-title-text {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #1a1a1a;
 }
 
-/* One transcribed line: its own flow row, wrapping onto further rules. */
-.sheet-line-lined {
-  font-size: 18px;
-  line-height: 36px;
-  min-height: 36px;
+/* Left margin cell carries the circled question number. */
+.booklet-margin {
+  padding-top: 22px;
+  display: flex;
+  justify-content: center;
+}
+.booklet-qnum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid #2b2b2b;
+  border-radius: 50%;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+/* Content stays in the cursive hand; bumped a touch for legibility and given a
+   roomy line-height so joined-cursive ascenders/descenders don't collide. */
+.booklet-content {
+  padding: 20px 24px 26px;
+  font-size: 20px;
+  line-height: 1.6;
+}
+
+/* One transcribed line: its own flow row, wrapping within the content column. */
+.booklet-line {
   white-space: normal;
   overflow-wrap: break-word;
 }
+/* A new point / heading sits apart from the previous block. */
+.booklet-block {
+  margin-top: 0.85em;
+}
+/* Abbreviation / multi-capital cluster rendered in a block-print hand so it
+   stays legible amid the joined cursive. Sized down slightly to sit on the
+   cursive baseline. */
+.run-caps {
+  font-family: var(--font-caps), "Comic Sans MS", cursive;
+  font-size: 0.82em;
+}
 
-/* A diagram crop interleaved at its place in the lined flow. */
-.sheet-lined-diagram {
+/* A word the writer struck out. */
+.run-strike {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  opacity: 0.7;
+}
+
+/* A section rule the writer drew, redrawn full-width across the column. */
+.booklet-divider {
+  border: 0;
+  border-top: 1px solid #2b2b2b;
+  margin: 0.6em 0;
+}
+
+/* A diagram crop interleaved at its place in the flow. */
+.booklet-diagram {
   display: block;
   max-width: 100%;
-  margin: 8px 0;
+  margin: 10px 0;
   object-fit: contain;
 }
-.sheet-lined-diagram-missing {
+.booklet-diagram-missing {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 64px;
-  margin: 8px 0;
+  margin: 10px 0;
   border: 1px dashed #b9b2a4;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.02);

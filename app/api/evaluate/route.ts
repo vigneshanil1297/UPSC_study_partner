@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
-import { getGenAI, MODEL_EVALUATE, withRetry } from "@/lib/gemini";
+import { MODEL_EVALUATE } from "@/lib/gemini";
+import { generateStructured, CLAUDE_OPUS } from "@/lib/llm";
 import {
   EvalResultSchema,
   StructuredPageSchema,
@@ -93,21 +94,15 @@ export async function POST(req: NextRequest) {
     const topicHint = questions.map((q) => q.text).join(" ");
     const exemplars = await loadExemplars(topicHint, evalMode);
 
-    const res = await withRetry(() => getGenAI().models.generateContent({
-      model: MODEL_EVALUATE,
-      contents: [{ text: evaluationUser(questions, pages, evalMode) }],
-      config: {
-        systemInstruction: evaluationSystem(exemplars, evalMode),
-        maxOutputTokens: 16000,
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA,
-      },
-    }));
-
-    const raw = res.text;
-    if (!raw) {
-      return NextResponse.json({ error: "Empty response from model. Try again." }, { status: 502 });
-    }
+    const raw = await generateStructured({
+      system: evaluationSystem(exemplars, evalMode),
+      parts: [{ text: evaluationUser(questions, pages, evalMode) }],
+      geminiSchema: RESPONSE_SCHEMA,
+      zodSchema: EvalResultSchema,
+      geminiModel: MODEL_EVALUATE,
+      claudeModel: CLAUDE_OPUS,
+      maxOutputTokens: 16000,
+    });
     const parsed = EvalResultSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) {
       return NextResponse.json({ error: "Model returned malformed evaluation. Try again." }, { status: 502 });

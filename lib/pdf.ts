@@ -85,11 +85,15 @@ export async function cropDiagramToPng(input: ImageInput, box: Box): Promise<str
   const W = img.naturalWidth || img.width;
   const H = img.naturalHeight || img.height;
   // 0–1000 → pixels, with a small pad so strokes near the edge aren't clipped.
-  const pad = 0.01;
-  const x0 = Math.max(0, Math.floor((Math.min(box.xmin, box.xmax) / 1000 - pad) * W));
-  const y0 = Math.max(0, Math.floor((Math.min(box.ymin, box.ymax) / 1000 - pad) * H));
-  const x1 = Math.min(W, Math.ceil((Math.max(box.xmin, box.xmax) / 1000 + pad) * W));
-  const y1 = Math.min(H, Math.ceil((Math.max(box.ymin, box.ymax) / 1000 + pad) * H));
+  // Bottom gets a larger pad: figure labels (low wage, low savings…) often sit
+  // just under the model's box and were getting clipped.
+  const padX = 0.012;
+  const padTop = 0.006;
+  const padBottom = 0.03;
+  const x0 = Math.max(0, Math.floor((Math.min(box.xmin, box.xmax) / 1000 - padX) * W));
+  const y0 = Math.max(0, Math.floor((Math.min(box.ymin, box.ymax) / 1000 - padTop) * H));
+  const x1 = Math.min(W, Math.ceil((Math.max(box.xmin, box.xmax) / 1000 + padX) * W));
+  const y1 = Math.min(H, Math.ceil((Math.max(box.ymin, box.ymax) / 1000 + padBottom) * H));
   const w = x1 - x0;
   const h = y1 - y0;
   if (w < 8 || h < 8) return null;
@@ -111,6 +115,11 @@ export async function cropDiagramToPng(input: ImageInput, box: Box): Promise<str
     const lum = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
     if (lum >= HI) px[i + 3] = 0;
     else if (lum > LO) px[i + 3] = Math.round((1 - (lum - LO) / (HI - LO)) * 255);
+    // Recolour the surviving ink to black so blue-pen diagrams render in black,
+    // matching the rest of the transcribed page. Paper is already transparent.
+    px[i] = 0;
+    px[i + 1] = 0;
+    px[i + 2] = 0;
   }
   ctx.putImageData(data, 0, 0);
   return canvas.toDataURL("image/png");

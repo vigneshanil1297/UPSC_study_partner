@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
-import { getGenAI, MODEL_EXTRACT, withRetry } from "@/lib/gemini";
+import { MODEL_EXTRACT } from "@/lib/gemini";
+import { generateStructured, CLAUDE_SONNET } from "@/lib/llm";
 import { EXTRACT_QUESTIONS_SYSTEM } from "@/lib/prompts";
 import { QuestionSchema } from "@/lib/criteria";
 import { requireUser } from "@/lib/auth-server";
@@ -47,25 +48,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const res = await withRetry(() => getGenAI().models.generateContent({
-      model: MODEL_EXTRACT,
-      contents: [
-        ...images.map((img) => ({ inlineData: { mimeType: img.media_type, data: img.data } })),
+    const QuestionsSchema = z.object({ questions: z.array(QuestionSchema) });
+    const raw = await generateStructured({
+      system: EXTRACT_QUESTIONS_SYSTEM,
+      parts: [
+        ...images.map((img) => ({ image: { mediaType: img.media_type, data: img.data } })),
         { text: "Extract the question list from these question-paper page(s)." },
       ],
-      config: {
-        systemInstruction: EXTRACT_QUESTIONS_SYSTEM,
-        maxOutputTokens: 8000,
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA,
-      },
-    }));
-
-    const raw = res.text;
-    if (!raw) {
-      return NextResponse.json({ error: "Empty response from model. Try again." }, { status: 502 });
-    }
-    const parsed = z.object({ questions: z.array(QuestionSchema) }).safeParse(JSON.parse(raw));
+      geminiSchema: RESPONSE_SCHEMA,
+      zodSchema: QuestionsSchema,
+      geminiModel: MODEL_EXTRACT,
+      claudeModel: CLAUDE_SONNET,
+      maxOutputTokens: 8000,
+    });
+    const parsed = QuestionsSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) {
       return NextResponse.json({ error: "Model returned malformed questions. Try again." }, { status: 502 });
     }

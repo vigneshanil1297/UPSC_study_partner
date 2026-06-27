@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Type } from "@google/genai";
-import { getGenAI, MODEL_TRANSCRIBE, withRetry } from "@/lib/gemini";
+import { MODEL_TRANSCRIBE } from "@/lib/gemini";
+import { generateStructured, CLAUDE_SONNET } from "@/lib/llm";
 import { TRANSCRIBE_SYSTEM } from "@/lib/prompts";
 import { StructuredPageSchema } from "@/lib/criteria";
 import { requireUser } from "@/lib/auth-server";
@@ -48,8 +49,9 @@ const RESPONSE_SCHEMA = {
                 text: { type: Type.STRING },
                 uncertain: { type: Type.BOOLEAN },
                 underline: { type: Type.BOOLEAN },
+                strike: { type: Type.BOOLEAN },
               },
-              required: ["text", "uncertain", "underline"],
+              required: ["text", "uncertain", "underline", "strike"],
             },
           },
         },
@@ -90,24 +92,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const res = await withRetry(() => getGenAI().models.generateContent({
-      model: MODEL_TRANSCRIBE,
-      contents: [
-        { inlineData: { mimeType: image.media_type, data: image.data } },
+    const raw = await generateStructured({
+      system: TRANSCRIBE_SYSTEM,
+      parts: [
+        { image: { mediaType: image.media_type, data: image.data } },
         { text: `Transcribe this answer-sheet page. It is page ${pageNumber ?? 1}.` },
       ],
-      config: {
-        systemInstruction: TRANSCRIBE_SYSTEM,
-        maxOutputTokens: 12000,
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA,
-      },
-    }));
-
-    const raw = res.text;
-    if (!raw) {
-      return NextResponse.json({ error: "Empty response from model. Try again." }, { status: 502 });
-    }
+      geminiSchema: RESPONSE_SCHEMA,
+      zodSchema: StructuredPageSchema,
+      geminiModel: MODEL_TRANSCRIBE,
+      claudeModel: CLAUDE_SONNET,
+      maxOutputTokens: 12000,
+    });
     // Force the page number the client assigned (model can miscount).
     const json = { ...JSON.parse(raw), pageNumber: pageNumber ?? 1 };
     const parsed = StructuredPageSchema.safeParse(json);
