@@ -6,7 +6,9 @@ import {
   EvalResultSchema,
   StructuredPageSchema,
   QuestionSchema,
+  isPsir,
   type EvalMode,
+  type Subject,
 } from "@/lib/criteria";
 import { evaluationSystem, evaluationUser } from "@/lib/prompts";
 import { loadExemplars } from "@/lib/exemplars";
@@ -74,6 +76,7 @@ const RESPONSE_SCHEMA = {
 
 const RequestSchema = z.object({
   mode: z.enum(["essay", "gs"]).optional(),
+  subject: z.enum(["gs1", "psir1", "psir2"]).optional(),
   questions: z.array(QuestionSchema).optional(),
   pages: z.array(StructuredPageSchema),
 });
@@ -87,16 +90,18 @@ export async function POST(req: NextRequest) {
     if (!body.success || !body.data.pages.length) {
       return NextResponse.json({ error: "No answer pages provided." }, { status: 400 });
     }
-    const { mode, questions = [], pages } = body.data;
-    const evalMode: EvalMode = mode === "gs" ? "gs" : "essay";
+    const { mode, subject = "gs1", questions = [], pages } = body.data;
+    const subj: Subject = subject;
+    // PSIR is always analytical (gs-style); only GS1 honours the essay/gs toggle.
+    const evalMode: EvalMode = isPsir(subj) ? "gs" : mode === "gs" ? "gs" : "essay";
 
     // Use the first question's text (or all) as the topic hint for exemplar retrieval.
     const topicHint = questions.map((q) => q.text).join(" ");
-    const exemplars = await loadExemplars(topicHint, evalMode);
+    const exemplars = await loadExemplars(topicHint, evalMode, subj);
 
     const raw = await generateStructured({
-      system: evaluationSystem(exemplars, evalMode),
-      parts: [{ text: evaluationUser(questions, pages, evalMode) }],
+      system: evaluationSystem(exemplars, evalMode, subj),
+      parts: [{ text: evaluationUser(questions, pages, evalMode, subj) }],
       geminiSchema: RESPONSE_SCHEMA,
       zodSchema: EvalResultSchema,
       geminiModel: MODEL_EVALUATE,

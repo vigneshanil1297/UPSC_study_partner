@@ -6,6 +6,20 @@ import { z } from "zod";
 // headings are strengths).
 export type EvalMode = "essay" | "gs";
 
+// Which paper's syllabus + knowledge base to judge against. "gs1" = General
+// Studies Paper I (essay or gs mode). "psir1"/"psir2" = the Political Science &
+// International Relations OPTIONAL papers — always analytical (gs-style), judged
+// against the PSIR syllabus + PSIR playbook on top of the topper playbook.
+export type Subject = "gs1" | "psir1" | "psir2";
+
+export const SUBJECTS: { key: Subject; label: string }[] = [
+  { key: "gs1", label: "GS Paper I" },
+  { key: "psir1", label: "PSIR Paper 1" },
+  { key: "psir2", label: "PSIR Paper 2" },
+];
+
+export const isPsir = (s: Subject): boolean => s === "psir1" || s === "psir2";
+
 // The evaluation dimensions for a UPSC Mains essay. Keep names + descriptions
 // here in one place — they drive both the prompt and the output schema.
 export const CRITERIA = [

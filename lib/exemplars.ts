@@ -1,11 +1,17 @@
 import { readFile, readdir } from "fs/promises";
 import path from "path";
-import type { EvalMode } from "./criteria";
+import type { EvalMode, Subject } from "./criteria";
 
 const EXEMPLAR_DIR = path.join(process.cwd(), "data", "exemplars");
 const MAX_EXEMPLARS = 3;
 
-type Exemplar = { file: string; topic: string; mode: EvalMode | "any"; body: string };
+type Exemplar = {
+  file: string;
+  topic: string;
+  mode: EvalMode | "any";
+  subject: Subject | "any";
+  body: string;
+};
 
 // Tiny stop-word list so topic matching keys on content words, not glue.
 const STOP = new Set(
@@ -41,14 +47,17 @@ async function readExemplars(): Promise<Exemplar[]> {
     if (!/\.(txt|md)$/i.test(f)) continue;
     const body = (await readFile(path.join(EXEMPLAR_DIR, f), "utf8")).trim();
     if (!body) continue;
-    // Optional metadata in the file: a "# Topic: ..." heading and a
-    // "mode: essay|gs" tag (anywhere, e.g. in a comment) to scope the sample.
+    // Optional metadata in the file: a "# Topic: ..." heading, a
+    // "mode: essay|gs" tag and a "subject: gs1|psir1|psir2" tag (anywhere, e.g.
+    // in a comment) to scope the sample to the right paper.
     const topicMatch = body.match(/^#\s*Topic:\s*(.+)$/im);
     const modeMatch = body.match(/mode:\s*(essay|gs)\b/i);
+    const subjectMatch = body.match(/subject:\s*(gs1|psir1|psir2)\b/i);
     out.push({
       file: f,
       topic: topicMatch?.[1]?.trim() ?? f,
       mode: (modeMatch?.[1]?.toLowerCase() as EvalMode) ?? "any",
+      subject: (subjectMatch?.[1]?.toLowerCase() as Subject) ?? "any",
       body,
     });
   }
@@ -60,14 +69,29 @@ async function readExemplars(): Promise<Exemplar[]> {
 // ranks the rest by keyword overlap with the topic, returning the top few so
 // the prompt stays grounded and within budget. If the corpus outgrows this,
 // swap for embedding + retrieval (e.g. Supabase pgvector).
-export async function loadExemplars(topic = "", mode?: EvalMode): Promise<string> {
+export async function loadExemplars(
+  topic = "",
+  mode?: EvalMode,
+  subject?: Subject,
+): Promise<string> {
   const all = await readExemplars();
   if (!all.length) return "";
 
-  // Prefer exemplars tagged for this mode (plus untagged "any"); fall back to
-  // everything if none match so we never return empty when samples exist.
-  const modeFiltered = mode ? all.filter((e) => e.mode === mode || e.mode === "any") : all;
-  const pool = modeFiltered.length ? modeFiltered : all;
+  // Scope to the right paper first: only same-subject (or untagged "any")
+  // exemplars — a PSIR sample must never be shown as the bar for a GS answer,
+  // and vice versa. If nothing matches the subject, return none rather than
+  // injecting an off-paper reference.
+  const subjectFiltered = subject
+    ? all.filter((e) => e.subject === subject || e.subject === "any")
+    : all;
+  if (!subjectFiltered.length) return "";
+
+  // Then prefer exemplars tagged for this mode (plus untagged "any"); fall back
+  // to the subject pool if none match so we never return empty needlessly.
+  const modeFiltered = mode
+    ? subjectFiltered.filter((e) => e.mode === mode || e.mode === "any")
+    : subjectFiltered;
+  const pool = modeFiltered.length ? modeFiltered : subjectFiltered;
 
   let chosen = pool;
   const query = tokenize(topic);
