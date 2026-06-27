@@ -49,11 +49,11 @@ const DEV_NO_AUTH = process.env.NEXT_PUBLIC_DEV_NO_AUTH === "1";
 
 export default function Home() {
   const [subject, setSubject] = useState<Subject>("gs1");
-  const [mode, setMode] = useState<EvalMode>("gs");
   const [topic, setTopic] = useState("");
-  // PSIR is always analytical; the essay/gs toggle only applies to GS Paper I.
+  // All three papers (GS Paper I, PSIR Paper 1/2) are evaluated as analytical
+  // answer-writing. The Essay paper is a separate UPSC paper, handled elsewhere.
   const psir = isPsir(subject);
-  const effectiveMode: EvalMode = psir ? "gs" : mode;
+  const effectiveMode: EvalMode = "gs";
   const [answerFiles, setAnswerFiles] = useState<File[]>([]);
   const [questionFiles, setQuestionFiles] = useState<File[]>([]);
 
@@ -115,7 +115,6 @@ export default function Home() {
   // Restore a past run into the editor/viewer.
   function viewRecord(r: EvalRecord) {
     setSubject(r.subject ?? "gs1");
-    setMode(r.mode);
     setQuestions(r.questions);
     setPages(r.pages);
     setResult(r.result);
@@ -379,26 +378,6 @@ export default function Home() {
         )}
       </section>
 
-      {/* Mode toggle — only GS Paper I has the essay vs answer choice */}
-      {!psir && (
-        <section className="mt-6">
-          <label className="block text-sm font-semibold">Evaluation mode</label>
-          <div className="mt-1 inline-flex rounded-md border border-neutral-300 bg-white p-0.5">
-            {(["gs", "essay"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`rounded px-4 py-1.5 text-sm font-medium transition ${
-                  mode === m ? "bg-neutral-900 text-white" : "text-neutral-600 hover:text-neutral-900"
-                }`}
-              >
-                {m === "essay" ? "Essay paper" : "GS answer"}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* Uploads */}
       <section className="mt-6 grid gap-4 sm:grid-cols-2">
         <div>
@@ -432,18 +411,14 @@ export default function Home() {
       {/* Topic fallback when no question paper is uploaded */}
       {questionFiles.length === 0 && (
         <section className="mt-4">
-          <label className="block text-sm font-semibold">
-            {effectiveMode === "essay" ? "Essay topic (optional)" : "Question (optional)"}
-          </label>
+          <label className="block text-sm font-semibold">Question (optional)</label>
           <input
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder={
-              effectiveMode === "essay"
-                ? "e.g. Forests are the best case studies for economic excellence"
-                : psir
-                  ? "e.g. Critically examine Rawls's theory of justice and its communitarian critiques."
-                  : "e.g. Evaluate the role of subsidiary alliance in expanding British control in India."
+              psir
+                ? "e.g. Critically examine Rawls's theory of justice and its communitarian critiques."
+                : "e.g. Evaluate the role of subsidiary alliance in expanding British control in India."
             }
             className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
           />
