@@ -11,6 +11,7 @@ create table if not exists public.evaluations (
   created_at    timestamptz not null default now(),
   user_id       uuid not null default auth.uid() references auth.users (id) on delete cascade,
   mode          text not null,
+  subject       text not null default 'gs1',       -- 'gs1' | 'psir1' | 'psir2'
   topic         text not null default '',         -- doubles as the history list title
   transcript    text not null default '',         -- legacy (flat-text era), unused by new runs
   overall_score integer not null,                 -- 0-100 percentage, for the trend chart
@@ -28,6 +29,8 @@ create table if not exists public.evaluations (
 alter table public.evaluations add column if not exists questions jsonb not null default '[]'::jsonb;
 alter table public.evaluations add column if not exists pages     jsonb not null default '[]'::jsonb;
 alter table public.evaluations add column if not exists result    jsonb not null default '{}'::jsonb;
+-- Migration for PSIR optional support (rows before this default to 'gs1'):
+alter table public.evaluations add column if not exists subject   text not null default 'gs1';
 
 create index if not exists evaluations_user_created_idx
   on public.evaluations (user_id, created_at desc);

@@ -114,6 +114,7 @@ export default function Home() {
 
   // Restore a past run into the editor/viewer.
   function viewRecord(r: EvalRecord) {
+    setSubject(r.subject ?? "gs1");
     setMode(r.mode);
     setQuestions(r.questions);
     setPages(r.pages);
@@ -275,7 +276,7 @@ export default function Home() {
       setResult(evalResult);
       if (historyEnabled && !DEV_NO_AUTH) {
         const title = effectiveQuestions[0]?.text ?? topic.trim();
-        saveEvaluation({ mode: effectiveMode, title, questions: effectiveQuestions, pages, result: evalResult })
+        saveEvaluation({ mode: effectiveMode, subject, title, questions: effectiveQuestions, pages, result: evalResult })
           .then(refreshHistory)
           .catch(() => {});
       }
@@ -554,7 +555,12 @@ export default function Home() {
                       {r.topic || "(untitled)"}
                     </span>
                     <span className="text-xs text-neutral-500">
-                      {r.mode === "essay" ? "Essay" : "GS"} · {new Date(r.created_at).toLocaleString()}
+                      {isPsir(r.subject ?? "gs1")
+                        ? SUBJECTS.find((s) => s.key === r.subject)?.label
+                        : r.mode === "essay"
+                          ? "Essay"
+                          : "GS"}{" "}
+                      · {new Date(r.created_at).toLocaleString()}
                     </span>
                   </span>
                   <span className="shrink-0 font-bold text-neutral-800">{r.overall_score}/100</span>
