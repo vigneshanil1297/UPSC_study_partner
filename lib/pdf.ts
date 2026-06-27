@@ -124,3 +124,27 @@ export async function cropDiagramToPng(input: ImageInput, box: Box): Promise<str
   ctx.putImageData(data, 0, 0);
   return canvas.toDataURL("image/png");
 }
+
+// Downscale a PNG data URL so its longest side is at most `maxDim` px, for
+// sending diagram crops to the evaluator without blowing past the request-body
+// cap. Returns the input unchanged if it's already small or can't be decoded.
+export async function downscaleDataUrl(dataUrl: string, maxDim = 768): Promise<string> {
+  const img = await new Promise<HTMLImageElement | null>((resolve) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => resolve(null);
+    el.src = dataUrl;
+  });
+  if (!img) return dataUrl;
+  const W = img.naturalWidth || img.width;
+  const H = img.naturalHeight || img.height;
+  const scale = Math.min(1, maxDim / Math.max(W, H));
+  if (scale >= 1) return dataUrl;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(W * scale);
+  canvas.height = Math.round(H * scale);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/png");
+}
