@@ -33,6 +33,11 @@ type GenerateArgs = {
   // CLAUDE_MODEL env var, if set, overrides this for every route.
   claudeModel: string;
   maxOutputTokens: number;
+  // Sampling temperature. Low values (~0.2) make the same input score the same
+  // way run-to-run — wanted for evaluation reproducibility. Applied on the
+  // gemini backend (the production path); the claude CLI exposes no temperature
+  // flag, so the claude/dev path ignores it.
+  temperature?: number;
 };
 
 // Per-route claude models. Transcription/extraction run on sonnet (fast, good
@@ -66,6 +71,7 @@ async function viaGemini(a: GenerateArgs): Promise<string> {
       config: {
         systemInstruction: a.system,
         maxOutputTokens: a.maxOutputTokens,
+        ...(a.temperature !== undefined ? { temperature: a.temperature } : {}),
         responseMimeType: "application/json",
         responseSchema: a.geminiSchema,
       },

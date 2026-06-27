@@ -1,0 +1,16 @@
+{
+  "label": "strong-gs1-women-shg (topper-grade, expect high)",
+  "subject": "gs1",
+  "mode": "gs",
+  "expected": { "minPercent": 65, "maxPercent": 90 },
+  "note": "Specific named schemes + data, obeys 'examine' (establishes then qualifies), balanced, headed structure, SDG-tagged way ahead. Should land high.",
+  "questions": [
+    { "number": "1", "text": "Examine the role of women's self-help groups (SHGs) in rural empowerment in India.", "marks": 10 }
+  ],
+  "answers": [
+    {
+      "questionNumber": "1",
+      "text": "Women's Self-Help Groups (SHGs) have become a key vehicle of rural empowerment, with over 90 lakh SHGs under DAY-NRLM covering nearly 10 crore households (Ministry of Rural Development).\nEconomic empowerment:\n- Micro-credit and SHG-bank linkage break dependence on moneylenders — Kudumbashree (Kerala) connects ~45 lakh women to formal credit.\n- SEWA (Gujarat) unionised informal women workers, securing wages and social security.\nSocial empowerment:\n- Collective agency raises bargaining power — the Andhra Pradesh SHG anti-arrack movement curbed alcoholism and domestic violence.\n- Women's control of household spending improves child health and schooling outcomes.\nPolitical empowerment:\n- SHG federations feed leadership into Panchayati Raj, the 73rd Amendment's reservation creating a pipeline of women representatives.\nHowever, limits remain: elite capture within groups, patriarchal backlash, and small loan sizes cap transformative impact; activity is largely confined to micro-enterprise rather than asset ownership.\nWay ahead: deepen bank linkage, converge skilling (DDU-GKY) with credit, and shift from micro-credit to sustainable livelihoods, aligning with SDG-5. SHGs thus empower substantively, but need scaffolding to become genuinely transformative."
+    }
+  ]
+}

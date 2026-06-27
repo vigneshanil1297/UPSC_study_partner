@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Type } from "@google/genai";
 import { MODEL_EVALUATE } from "@/lib/gemini";
 import { generateStructured, CLAUDE_OPUS } from "@/lib/llm";
 import {
@@ -10,6 +9,7 @@ import {
   type EvalMode,
   type Subject,
 } from "@/lib/criteria";
+import { EVAL_RESPONSE_SCHEMA } from "@/lib/eval-schema";
 import { evaluationSystem, evaluationUser } from "@/lib/prompts";
 import { loadExemplars } from "@/lib/exemplars";
 import { requireUser } from "@/lib/auth-server";
@@ -17,64 +17,6 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
-
-// Gemini response schema (OpenAPI subset). One AnswerEvaluation per answered
-// question; inline_notes anchored to page + lineIndex.
-const answerSchema = {
-  type: Type.OBJECT,
-  properties: {
-    questionNumber: { type: Type.STRING, nullable: true },
-    core_demand_met: { type: Type.STRING, enum: ["met", "partial", "not"] },
-    score: { type: Type.NUMBER },
-    max_score: { type: Type.NUMBER },
-    one_line: { type: Type.STRING },
-    demands: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          point: { type: Type.STRING },
-          status: { type: Type.STRING, enum: ["hit", "partial", "missed"] },
-        },
-        required: ["point", "status"],
-      },
-    },
-    value_additions: { type: Type.ARRAY, items: { type: Type.STRING } },
-    structure_note: { type: Type.STRING, nullable: true },
-    diagram_note: { type: Type.STRING, nullable: true },
-    inline_notes: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          page: { type: Type.NUMBER },
-          lineIndex: { type: Type.NUMBER },
-          type: { type: Type.STRING, enum: ["add", "fix", "praise"] },
-          text: { type: Type.STRING },
-        },
-        required: ["page", "lineIndex", "type", "text"],
-      },
-    },
-  },
-  required: [
-    "questionNumber",
-    "core_demand_met",
-    "score",
-    "max_score",
-    "one_line",
-    "demands",
-    "value_additions",
-    "structure_note",
-    "diagram_note",
-    "inline_notes",
-  ],
-};
-
-const RESPONSE_SCHEMA = {
-  type: Type.OBJECT,
-  properties: { answers: { type: Type.ARRAY, items: answerSchema } },
-  required: ["answers"],
-};
 
 // Diagram crops to evaluate visually. The client caps the count and downscales
 // each PNG so the request stays under Vercel's body limit. `png` is a data URL.
@@ -141,11 +83,13 @@ export async function POST(req: NextRequest) {
         { text: evaluationUser(questions, pages, evalMode, subj) + diagramManifest },
         ...diagramParts.map(({ part }) => part),
       ],
-      geminiSchema: RESPONSE_SCHEMA,
+      geminiSchema: EVAL_RESPONSE_SCHEMA,
       zodSchema: EvalResultSchema,
       geminiModel: MODEL_EVALUATE,
       claudeModel: CLAUDE_OPUS,
       maxOutputTokens: 16000,
+      // Low temperature so the same answer scores reproducibly run-to-run.
+      temperature: 0.2,
     });
     const parsed = EvalResultSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) {

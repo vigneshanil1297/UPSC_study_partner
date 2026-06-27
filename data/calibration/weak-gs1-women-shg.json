@@ -1,0 +1,16 @@
+{
+  "label": "weak-gs1-women-shg (vague stub, expect low)",
+  "subject": "gs1",
+  "mode": "gs",
+  "expected": { "minPercent": 8, "maxPercent": 35 },
+  "note": "Same question, but no named schemes, no data, no balance, ignores the 'examine' directive, generic platitudes. Should land low.",
+  "questions": [
+    { "number": "1", "text": "Examine the role of women's self-help groups (SHGs) in rural empowerment in India.", "marks": 10 }
+  ],
+  "answers": [
+    {
+      "questionNumber": "1",
+      "text": "Women are very important for society and the nation. Self-help groups help women a lot in their lives. They give money to women so that they can do some business and earn. Because of this women become strong and independent. The government is also helping women through many schemes and programmes. Women should be given more rights and more equality in society. If women are empowered then the whole country will develop and progress. So self-help groups are very good for women empowerment and for the development of the nation."
+    }
+  ]
+}
