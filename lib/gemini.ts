@@ -13,6 +13,14 @@ export const MODEL_EVALUATE = "gemini-3.5-flash";
 // cases with backoff, honoring Gemini's suggested retryDelay when present.
 const MAX_RETRIES = 5;
 
+// Wall-clock budget for all retries + sleeps combined. Vercel's Hobby plan kills
+// a function at 60s; if we sleep past that the platform serves an HTML error
+// page (which the client can't parse) instead of our JSON. Stop retrying with
+// time to spare so the route returns a clean JSON error instead of timing out.
+const RETRY_BUDGET_MS = 45_000;
+// Cap any single backoff so one long sleep can't eat the whole budget.
+const MAX_BACKOFF_MS = 8_000;
+
 function transientStatus(err: unknown): number | null {
   const msg = err instanceof Error ? err.message : String(err);
   // The SDK surfaces the upstream JSON in the message; match the codes there.
@@ -32,19 +40,23 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Run a Gemini call, retrying on 429/503 with exponential backoff + jitter.
 export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
-  let lastErr: unknown;
+  const start = Date.now();
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       return await fn();
     } catch (err) {
       const status = transientStatus(err);
       if (status === null || attempt === MAX_RETRIES) throw err;
-      lastErr = err;
-      const backoff = Math.min(2 ** attempt * 1000, 30000) + Math.random() * 1000;
-      await sleep(suggestedDelayMs(err) ?? backoff);
+      const backoff = Math.min(2 ** attempt * 1000, MAX_BACKOFF_MS) + Math.random() * 1000;
+      const wait = Math.min(suggestedDelayMs(err) ?? backoff, MAX_BACKOFF_MS);
+      // Bail if waiting would push us past the function's time budget — better to
+      // throw the rate-limit error now (clean JSON) than be killed mid-sleep.
+      if (Date.now() - start + wait > RETRY_BUDGET_MS) throw err;
+      await sleep(wait);
     }
   }
-  throw lastErr;
+  // Unreachable: the loop either returns or throws above.
+  throw new Error("Retry budget exhausted.");
 }
 
 // Lazily construct the client so importing this module (e.g. during build)

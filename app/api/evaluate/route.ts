@@ -16,7 +16,9 @@ import { requireUser } from "@/lib/auth-server";
 import { z } from "zod";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+// Vercel Hobby plan caps function duration at 60s; 120 is silently ignored
+// there. Match the real limit so behavior is honest.
+export const maxDuration = 60;
 
 // Diagram crops to evaluate visually. The client caps the count and downscales
 // each PNG so the request stays under Vercel's body limit. `png` is a data URL.

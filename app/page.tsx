@@ -42,6 +42,28 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T, index: num
   return out;
 }
 
+// Parse an API response safely. Our routes return JSON, but Vercel can serve a
+// plain-text/HTML error page ("An error occurred…") on a function timeout or
+// platform error. Blindly calling res.json() on that throws "Unexpected token",
+// masking the real failure — so read the text, try to parse, and fall back to a
+// status-based message when it isn't JSON.
+async function readJson(res: Response, fallback: string): Promise<any> {
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    // Non-JSON body (e.g. a gateway/timeout page) — surface a clean message.
+    throw new Error(
+      res.status === 504 || res.status === 502
+        ? "Server timed out (free-tier limit). Try fewer pages or retry."
+        : `${fallback} (HTTP ${res.status}).`,
+    );
+  }
+  if (!res.ok) throw new Error(json?.error ?? `${fallback} (HTTP ${res.status}).`);
+  return json;
+}
+
 // Local-dev escape hatch: with NEXT_PUBLIC_DEV_NO_AUTH=1 the Google sign-in
 // wall is skipped so you can use the app without OAuth. The server mirrors this
 // (lib/auth-server.ts) and both sides additionally require a non-production
@@ -171,8 +193,7 @@ export default function Home() {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
       body: JSON.stringify({ image, pageNumber }),
     });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error ?? "Transcription failed.");
+    const json = await readJson(res, "Transcription failed.");
     return json.page as StructuredPage;
   }
 
@@ -226,8 +247,7 @@ export default function Home() {
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
           body: JSON.stringify({ images: qImages }),
         });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Question extraction failed.");
+        const json = await readJson(res, "Question extraction failed.");
         setQuestions(json.questions as Question[]);
       } else {
         setQuestions([]);
@@ -299,8 +319,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
         body: JSON.stringify({ mode: effectiveMode, subject, questions: effectiveQuestions, pages: leanPages, diagrams }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Evaluation failed.");
+      const json = await readJson(res, "Evaluation failed.");
       const evalResult = json.result as EvalResult;
       setResult(evalResult);
       if (historyEnabled && !DEV_NO_AUTH) {
