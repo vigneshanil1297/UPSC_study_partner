@@ -88,3 +88,39 @@ $$;
 
 revoke all on function public.consume_eval_credit(text) from public;
 grant execute on function public.consume_eval_credit(text) to anon, authenticated;
+
+-- Refund one credit to budget p_kind. Called when a paid call was charged
+-- up-front (consume_eval_credit) but then FAILED before producing a result
+-- (Vercel/Cloud Run timeout, model 5xx, malformed output) — so a failure the
+-- user didn't cause doesn't burn their daily allowance. Decrements never below
+-- zero, and only touches daily_used when the charge happened today (a refund
+-- arriving after the IST day-rollover would otherwise underflow yesterday's
+-- count into today's). consume is still the safe up-front guard; this just
+-- gives back what a confirmed failure didn't spend.
+create or replace function public.refund_eval_credit(p_kind text default 'eval')
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  today date := (now() at time zone 'Asia/Kolkata')::date;
+  r     public.eval_budget;
+begin
+  select * into r from public.eval_budget where id = p_kind for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'reason', 'no_budget_row');
+  end if;
+
+  update public.eval_budget
+     set total_used = greatest(r.total_used - 1, 0),
+         daily_used = case when r.day = today then greatest(r.daily_used - 1, 0)
+                           else r.daily_used end
+   where id = p_kind;
+
+  return jsonb_build_object('ok', true, 'refunded', true);
+end;
+$$;
+
+revoke all on function public.refund_eval_credit(text) from public;
+grant execute on function public.refund_eval_credit(text) to anon, authenticated;

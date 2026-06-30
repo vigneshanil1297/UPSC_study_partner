@@ -19,7 +19,9 @@ const MAX_RETRIES = 5;
 // a function at 60s; if we sleep past that the platform serves an HTML error
 // page (which the client can't parse) instead of our JSON. Stop retrying with
 // time to spare so the route returns a clean JSON error instead of timing out.
-const RETRY_BUDGET_MS = 45_000;
+// Override with RETRY_BUDGET_MS where the host allows longer requests (the eval
+// Cloud Run service runs with a 300s timeout — see infra/eval-run).
+const RETRY_BUDGET_MS = Number(process.env.RETRY_BUDGET_MS) || 45_000;
 // Cap any single backoff so one long sleep can't eat the whole budget.
 const MAX_BACKOFF_MS = 8_000;
 

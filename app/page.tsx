@@ -73,6 +73,14 @@ async function readJson(res: Response, fallback: string): Promise<any> {
 // build, so this can never open up the deployed app.
 const DEV_NO_AUTH = process.env.NEXT_PUBLIC_DEV_NO_AUTH === "1";
 
+// The evaluation call runs gemini-3.1-pro and can take minutes — past Vercel's
+// 60s function cap — so in production it's hosted on a Cloud Run service (300s
+// timeout) the browser calls directly. Set NEXT_PUBLIC_EVAL_URL to that
+// service's base URL. When unset (local dev), fall back to the in-app route,
+// which goes through the claude CLI and has no such limit. See infra/eval-run.
+const EVAL_BASE = process.env.NEXT_PUBLIC_EVAL_URL?.replace(/\/+$/, "");
+const EVAL_ENDPOINT = EVAL_BASE ? `${EVAL_BASE}/evaluate` : "/api/evaluate";
+
 export default function Home() {
   const [subject, setSubject] = useState<Subject>("gs1");
   const [topic, setTopic] = useState("");
@@ -322,7 +330,7 @@ export default function Home() {
       );
 
       const token = await getAccessToken();
-      const res = await fetch("/api/evaluate", {
+      const res = await fetch(EVAL_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
         body: JSON.stringify({ mode: effectiveMode, subject, questions: effectiveQuestions, pages: leanPages, diagrams }),

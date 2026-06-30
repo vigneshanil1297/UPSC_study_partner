@@ -1,0 +1,12 @@
+# Build the eval-run image from the REPO ROOT context (so the Dockerfile can
+# COPY ../lib and data/exemplars) while keeping the Dockerfile in this subdir.
+# `gcloud run deploy --source` can't point at a non-root Dockerfile on older
+# gcloud, so build here, then `gcloud run deploy --image`.
+#
+#   gcloud builds submit --config infra/eval-run/cloudbuild.yaml \
+#     --substitutions=_IMAGE="gcr.io/$PROJECT_ID/cse-eval-run" .
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "infra/eval-run/Dockerfile", "-t", "${_IMAGE}", "."]
+images:
+  - "${_IMAGE}"

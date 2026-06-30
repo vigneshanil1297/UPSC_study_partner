@@ -31,3 +31,18 @@ export async function consumeCredit(kind: BudgetKind = "eval"): Promise<CreditRe
   if (error) return { ok: false, reason: `budget_check_failed: ${error.message}` };
   return data as CreditResult;
 }
+
+// Give back a credit consumed up-front for a paid call that then FAILED (timeout,
+// model error, malformed output). Best-effort: a refund failure is swallowed so
+// it never masks the original error the caller is about to report. No-op when
+// Supabase env is absent (the consume was a no-op too).
+export async function refundCredit(kind: BudgetKind = "eval"): Promise<void> {
+  if (!url || !key) return;
+  try {
+    const supabase = createClient(url, key);
+    await supabase.rpc("refund_eval_credit", { p_kind: kind });
+  } catch {
+    // Swallow — the credit guard is allowed to over-charge on a refund failure
+    // (safe direction), and we must not overwrite the real error.
+  }
+}

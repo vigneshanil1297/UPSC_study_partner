@@ -13,7 +13,7 @@ import { EVAL_RESPONSE_SCHEMA } from "@/lib/eval-schema";
 import { evaluationSystem, evaluationUser } from "@/lib/prompts";
 import { loadExemplars } from "@/lib/exemplars";
 import { requireUser } from "@/lib/auth-server";
-import { consumeCredit } from "@/lib/eval-budget";
+import { consumeCredit, refundCredit } from "@/lib/eval-budget";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -47,6 +47,9 @@ function dataUrlToImagePart(png: string): { image: { mediaType: string; data: st
 }
 
 export async function POST(req: NextRequest) {
+  // Whether a credit was consumed, so the catch can refund it on a post-charge
+  // failure. Declared outside the try so the catch block can see it.
+  let charged = false;
   try {
     if (!(await requireUser(req))) {
       return NextResponse.json({ error: "Not authorized." }, { status: 401 });
@@ -57,9 +60,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Hard spend cap: atomically consume one credit before doing any paid work.
-    // Consumed up-front (not after) so the total can never overshoot; a credit
-    // spent on a later-failed call is not refunded — that's the safe direction
-    // for a budget guard. See data/eval-budget.sql.
+    // Consumed up-front (not after) so the total can never overshoot under
+    // concurrent requests. A confirmed failure below refunds it (refundCredit),
+    // so a timeout/model-error doesn't burn the user's daily allowance — but the
+    // charge stays if the process dies before reaching the refund (safe
+    // direction for a budget guard). See data/eval-budget.sql.
     const credit = await consumeCredit("eval");
     if (!credit.ok) {
       const msg =
@@ -70,6 +75,7 @@ export async function POST(req: NextRequest) {
             : `Evaluation temporarily unavailable (${credit.reason}).`;
       return NextResponse.json({ error: msg }, { status: 429 });
     }
+    charged = true;
     const { mode, subject = "gs1", questions = [], pages, diagrams = [] } = body.data;
     const subj: Subject = subject;
     // PSIR is always analytical (gs-style); only GS1 honours the essay/gs toggle.
@@ -111,11 +117,14 @@ export async function POST(req: NextRequest) {
     });
     const parsed = EvalResultSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) {
+      await refundCredit("eval");
+      charged = false;
       return NextResponse.json({ error: "Model returned malformed evaluation. Try again." }, { status: 502 });
     }
 
     return NextResponse.json({ result: parsed.data });
   } catch (err) {
+    if (charged) await refundCredit("eval");
     const message = err instanceof Error ? err.message : "Evaluation failed.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
