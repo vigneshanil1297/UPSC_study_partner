@@ -5,6 +5,7 @@ import { generateStructured, CLAUDE_SONNET } from "@/lib/llm";
 import { EXTRACT_QUESTIONS_SYSTEM } from "@/lib/prompts";
 import { QuestionSchema } from "@/lib/criteria";
 import { requireUser } from "@/lib/auth-server";
+import { consumeCredit } from "@/lib/eval-budget";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -46,6 +47,18 @@ export async function POST(req: NextRequest) {
       if (!ALLOWED.has(img.media_type)) {
         return NextResponse.json({ error: `Unsupported image type: ${img.media_type}` }, { status: 400 });
       }
+    }
+
+    // Same flash-lite spend cap as transcription (one credit per call).
+    const credit = await consumeCredit("flashlite");
+    if (!credit.ok) {
+      const msg =
+        credit.reason === "daily_exhausted"
+          ? `Daily limit reached (${credit.daily_max}/day). Try again tomorrow.`
+          : credit.reason === "total_exhausted"
+            ? `Budget exhausted (${credit.total_used}/${credit.total_budget} calls used).`
+            : `Temporarily unavailable (${credit.reason}).`;
+      return NextResponse.json({ error: msg }, { status: 429 });
     }
 
     const QuestionsSchema = z.object({ questions: z.array(QuestionSchema) });

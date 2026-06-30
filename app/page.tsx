@@ -27,8 +27,9 @@ import {
   type EvalRecord,
 } from "@/lib/supabase";
 
-// Run async tasks with a small concurrency cap — keeps us under Gemini's
-// free-tier rate limit while still transcribing pages in parallel.
+// Run async tasks with a small concurrency cap — transcribes pages in parallel
+// while staying under Gemini's paid-tier flash-lite RPM. `withRetry` backs off
+// on any 429, so a transient rate-limit slows a page rather than failing it.
 async function mapPool<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>) {
   const out: R[] = new Array(items.length);
   let next = 0;
@@ -215,7 +216,7 @@ export default function Home() {
       //    page's true aspect ratio and crop any diagrams out of the scan,
       //    masking the paper so they paste in as clean figures (req 4, 5).
       let done = 0;
-      const transcribed = await mapPool(rendered, 1, async (rp, i) => {
+      const transcribed = await mapPool(rendered, 4, async (rp, i) => {
         const page = await transcribePage(rp.input, i + 1);
         page.aspect = rp.height / rp.width;
         await Promise.all(

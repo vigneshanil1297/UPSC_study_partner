@@ -13,6 +13,7 @@ import { EVAL_RESPONSE_SCHEMA } from "@/lib/eval-schema";
 import { evaluationSystem, evaluationUser } from "@/lib/prompts";
 import { loadExemplars } from "@/lib/exemplars";
 import { requireUser } from "@/lib/auth-server";
+import { consumeCredit } from "@/lib/eval-budget";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -53,6 +54,21 @@ export async function POST(req: NextRequest) {
     const body = RequestSchema.safeParse(await req.json());
     if (!body.success || !body.data.pages.length) {
       return NextResponse.json({ error: "No answer pages provided." }, { status: 400 });
+    }
+
+    // Hard spend cap: atomically consume one credit before doing any paid work.
+    // Consumed up-front (not after) so the total can never overshoot; a credit
+    // spent on a later-failed call is not refunded — that's the safe direction
+    // for a budget guard. See data/eval-budget.sql.
+    const credit = await consumeCredit("eval");
+    if (!credit.ok) {
+      const msg =
+        credit.reason === "daily_exhausted"
+          ? `Daily evaluation limit reached (${credit.daily_max}/day). Try again tomorrow.`
+          : credit.reason === "total_exhausted"
+            ? `Evaluation budget exhausted (${credit.total_used}/${credit.total_budget} calls used).`
+            : `Evaluation temporarily unavailable (${credit.reason}).`;
+      return NextResponse.json({ error: msg }, { status: 429 });
     }
     const { mode, subject = "gs1", questions = [], pages, diagrams = [] } = body.data;
     const subj: Subject = subject;

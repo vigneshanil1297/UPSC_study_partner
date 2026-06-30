@@ -6,7 +6,9 @@ import { GoogleGenAI } from "@google/genai";
 // ~20/day) for the single high-value reasoning call per run: evaluation.
 export const MODEL_TRANSCRIBE = "gemini-3.1-flash-lite";
 export const MODEL_EXTRACT = "gemini-3.1-flash-lite";
-export const MODEL_EVALUATE = "gemini-3.5-flash";
+// Paid: the single high-value reasoning call per run. Spend is hard-capped by
+// the credit counter in app/api/evaluate/route.ts (data/eval-budget.sql).
+export const MODEL_EVALUATE = "gemini-3.1-pro";
 
 // Free tier is heavily rate-limited (e.g. 5 req/min on 2.5-flash) and the
 // shared backend occasionally returns 503 under load. Retry both transient

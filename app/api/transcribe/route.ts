@@ -5,6 +5,7 @@ import { generateStructured, CLAUDE_SONNET } from "@/lib/llm";
 import { TRANSCRIBE_SYSTEM } from "@/lib/prompts";
 import { StructuredPageSchema } from "@/lib/criteria";
 import { requireUser } from "@/lib/auth-server";
+import { consumeCredit } from "@/lib/eval-budget";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -90,6 +91,19 @@ export async function POST(req: NextRequest) {
         { error: `Unsupported image type: ${image.media_type}` },
         { status: 400 },
       );
+    }
+
+    // Spend cap for the flash-lite calls (one credit per page). Bounds a
+    // retry/loop storm on this route, which the eval cap doesn't cover.
+    const credit = await consumeCredit("flashlite");
+    if (!credit.ok) {
+      const msg =
+        credit.reason === "daily_exhausted"
+          ? `Daily transcription limit reached (${credit.daily_max}/day). Try again tomorrow.`
+          : credit.reason === "total_exhausted"
+            ? `Transcription budget exhausted (${credit.total_used}/${credit.total_budget} calls used).`
+            : `Transcription temporarily unavailable (${credit.reason}).`;
+      return NextResponse.json({ error: msg }, { status: 429 });
     }
 
     const raw = await generateStructured({
