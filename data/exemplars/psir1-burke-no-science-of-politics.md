@@ -1,0 +1,10 @@
+# Topic: "There is no science of politics any more than there is a science of aesthetics — for the lines of politics are not the lines of mathematics" (Burke). Comment.
+
+<!-- mode: gs · subject: psir1 -->
+<!-- Topper reference: Astha Jain (AIR 9, CSE 2025), Shubhra Ranjan PSIR Crash Course Test 1, Q1(a), 10 marks. Faithful transcription of a high-scoring handwritten answer — the bar for an "excellent" PSIR Paper-1 (political theory / nature of the discipline) 10-marker. Note the technique: locate the quote inside a named debate (behaviouralism vs its critics), deploy thinkers as shorthand (Easton, Burke, Rawls), give a one-line example to concretise, and close by resolving the debate forward (post-behaviouralism) rather than sitting on the fence. Compact, underline-keyword style. -->
+
+The behavioural movement in political science attempted to make a 'science of politics' and apply mathematical methods to political evaluation. David Easton called for scientific, verifiable, testifiable and reliable theories in political science; he criticised the philosophical approach as having led to the "first decline" of political science.
+
+Edmund Burke criticises the behaviouralists, saying we can't make a science of politics. This leads to compromising the subject matter and scope of political science. Behaviouralists excessively focus on mathematics and statistics, but political science is vast and the application of these methods is limited — e.g. voting behaviour can be studied, but not protests. They also compromise *values* in the attempt at scientific study; but Rawls suggested values are "ideals to be pursued by society."
+
+'Science' itself has to be studied broadly, and political science is an applied science. Easton himself acknowledged this, leading to the emergence of POST-BEHAVIOURALISM — which restored relevance and values to the discipline while retaining rigour. Thus, while politics cannot be reduced to the lines of mathematics, the scientific spirit still enriches it.
