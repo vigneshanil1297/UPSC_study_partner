@@ -1,0 +1,12 @@
+# Topic: Bring out the major differences between the Classical Realism of Hans Morgenthau and the Neorealism of Kenneth Waltz.
+
+<!-- mode: gs · subject: psir2 -->
+<!-- Topper reference: Shakti Dubey (AIR 1, CSE 2024), Shubhra Ranjan PSIR Sectional Test 13, Q1, 15 marks (~200 words). Faithful transcription of a high-scoring handwritten answer — the bar for an "excellent" PSIR Paper-2 (IR theory) 15-marker. Technique for a "differences between X and Y": open with the shared parent (realism + its pillars), define each thinker crisply with the signature concept (Morgenthau animus dominandi / human nature; Waltz structure), draw the contrasts on named axes (basis of theory, offensive vs defensive realism), THEN concede the common tenets so it doesn't read as a caricature, and close by naming the school that supersedes both (neoclassical realism / Zakaria). Underline keywords. -->
+
+**Realism** is a hegemonic school of thought in international politics, based on certain ideological pillars — *anarchical world order*, *struggle for power*, and *balance of power*. Its two major traditions are the **Classical Realism** of Morgenthau and the **Neorealism** of Kenneth Waltz.
+
+*Morgenthau*, the father of classical realism, gives a schematic explanation of world politics based on **human nature** — just as man is power-seeking (*animus dominandi*) and prioritises self-interest, so nations too strive for power maximisation, keeping national interest as priority. On this he founds his **six principles** of international politics, all driven by national interest.
+
+**Neorealism** is an ideological departure given by *Waltz*. He criticises Morgenthau's realism for being based on human nature — which is unpredictable, so a *general, scientific theory* cannot rest on such a subjective assumption. Waltz instead grounds the theory in the **anarchical structure** of international politics (hence "structural realism"), yielding an *objective concept that can be applied universally*. Waltz also rejects Morgenthau's view that states are **power-maximisers** (*offensive realism*); for him power is only a *means* to security, so states are **security-maximisers** (*defensive realism*).
+
+Though the two differ significantly, they share **common tenets** — anarchical world order, balance of power, and national interest. To rectify the shortcomings of neorealism, later scholars like *Fareed Zakaria* advanced **neoclassical realism**, which treats *both* the structure of international politics *and* human nature as essential components.
