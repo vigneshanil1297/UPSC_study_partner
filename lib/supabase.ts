@@ -69,6 +69,21 @@ export async function fetchHistory(limit = 20): Promise<EvalRecord[]> {
   return (data ?? []) as EvalRecord[];
 }
 
+// The whole-history feed the mistake bank is built from. Pulls only the
+// columns the bank reads (skips the heavy `pages` transcript) and reaches well
+// past the 20-row history window so the bank spans every test, not just recent
+// ones. RLS still scopes this to the signed-in user.
+export async function fetchMistakeSources(limit = 500): Promise<EvalRecord[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("evaluations")
+    .select("id, created_at, subject, topic, result")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as EvalRecord[];
+}
+
 export async function deleteEvaluation(id: string): Promise<void> {
   if (!supabase) return;
   const { error } = await supabase.from("evaluations").delete().eq("id", id);

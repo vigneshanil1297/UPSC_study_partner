@@ -15,6 +15,7 @@ import { renderPdfToImages, cropDiagramToPng, downscaleDataUrl, type ImageInput,
 import { computeStructure } from "@/lib/structure";
 import AnswerSheet from "@/app/components/AnswerSheet";
 import DemandChecklist from "@/app/components/DemandChecklist";
+import MistakeBank from "@/app/components/MistakeBank";
 import {
   supabase,
   historyEnabled,
@@ -22,6 +23,7 @@ import {
   signOut,
   getAccessToken,
   fetchHistory,
+  fetchMistakeSources,
   saveEvaluation,
   deleteEvaluation,
   type EvalRecord,
@@ -90,6 +92,9 @@ export default function Home() {
   const [error, setError] = useState("");
 
   const [history, setHistory] = useState<EvalRecord[]>([]);
+  // Whole-history feed the user-wide mistake bank is derived from (wider than
+  // the 20-row history window above).
+  const [mistakeSources, setMistakeSources] = useState<EvalRecord[]>([]);
   const [user, setUser] = useState<{ email: string } | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [authorized, setAuthorized] = useState<boolean | null>(null);
@@ -130,7 +135,9 @@ export default function Home() {
 
   async function refreshHistory() {
     try {
-      setHistory(await fetchHistory());
+      const [hist, sources] = await Promise.all([fetchHistory(), fetchMistakeSources()]);
+      setHistory(hist);
+      setMistakeSources(sources);
     } catch {
       // History is best-effort; never block evaluating on it.
     }
@@ -603,6 +610,9 @@ export default function Home() {
           </ul>
         </section>
       )}
+
+      {/* User-wide mistake bank — cumulative across every saved test. */}
+      {historyEnabled && <MistakeBank sources={mistakeSources} />}
     </main>
   );
 }
