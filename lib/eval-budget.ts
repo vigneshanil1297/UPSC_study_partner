@@ -7,7 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-// Which budget to draw from: 'eval' = gemini-3.1-pro, 'flashlite' = the
+// Which budget to draw from: 'eval' = gemini-3.1-pro-preview, 'flashlite' = the
 // per-page transcription + question extraction calls.
 export type BudgetKind = "eval" | "flashlite";
 
