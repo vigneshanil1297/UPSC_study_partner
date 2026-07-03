@@ -2,8 +2,8 @@
   "label": "strong-gs1-women-shg (topper-grade, expect high)",
   "subject": "gs1",
   "mode": "gs",
-  "expected": { "minPercent": 65, "maxPercent": 90 },
-  "note": "Specific named schemes + data, obeys 'examine' (establishes then qualifies), balanced, headed structure, SDG-tagged way ahead. Should land high.",
+  "expected": { "minPercent": 55, "maxPercent": 80 },
+  "note": "Specific named schemes + data, obeys 'examine' (establishes then qualifies), balanced, headed structure, SDG-tagged way ahead. Should land high. Band re-set for the anchored UPSC-style scale (55-70% = good-to-topper).",
   "questions": [
     { "number": "1", "text": "Examine the role of women's self-help groups (SHGs) in rural empowerment in India.", "marks": 10 }
   ],

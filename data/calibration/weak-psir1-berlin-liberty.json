@@ -1,0 +1,16 @@
+{
+  "label": "weak-psir1-berlin-liberty (thinker-free, expect low)",
+  "subject": "psir1",
+  "mode": "gs",
+  "expected": { "minPercent": 15, "maxPercent": 45 },
+  "note": "Same question, deliberately weak: fluent but thinker-free, no quotes, single viewpoint, no staged debate, no synthesis, ignores 'critically examine'. Should land clearly below the strong fixture.",
+  "questions": [
+    { "number": "1", "text": "Critically examine Isaiah Berlin's two concepts of liberty.", "marks": 15 }
+  ],
+  "answers": [
+    {
+      "questionNumber": "1",
+      "text": "Liberty is very important in political science and has been discussed by many thinkers over the years.\nThere are two types of liberty. Negative liberty means nobody stops you from doing what you want. Positive liberty means you are able to do what you want to do in your life.\nNegative liberty is about freedom from interference. For example, if the government does not stop people from speaking, they have negative liberty. This is important in democracies because people should be free.\nPositive liberty is about having the ability and resources to achieve your goals. A poor person may be free on paper but cannot really enjoy freedom. So the government should help people become truly free.\nBoth types of liberty are important for society. Too much control by the state is bad, but too little support is also bad. A balance is needed between the two types.\nIn conclusion, liberty has two concepts and both have advantages and disadvantages. The state should protect freedom and also help people. This way both kinds of liberty can be achieved in a country like India."
+    }
+  ]
+}

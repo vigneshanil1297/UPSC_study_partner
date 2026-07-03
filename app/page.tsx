@@ -81,9 +81,26 @@ const DEV_NO_AUTH = process.env.NEXT_PUBLIC_DEV_NO_AUTH === "1";
 const EVAL_BASE = process.env.NEXT_PUBLIC_EVAL_URL?.replace(/\/+$/, "");
 const EVAL_ENDPOINT = EVAL_BASE ? `${EVAL_BASE}/evaluate` : "/api/evaluate";
 
+const SUBJECT_STORAGE_KEY = "upsc-eval-subject";
+const isSubject = (s: string | null): s is Subject => s === "gs1" || s === "psir1" || s === "psir2";
+
 export default function Home() {
-  const [subject, setSubject] = useState<Subject>("gs1");
+  // Default to PSIR Paper 1 (the primary use), then restore the last-used paper.
+  const [subject, setSubject] = useState<Subject>("psir1");
   const [topic, setTopic] = useState("");
+  // Marks for the typed-question fallback (no question paper uploaded), so a
+  // 15/20-marker isn't silently scored out of 10.
+  const [topicMarks, setTopicMarks] = useState<string>("");
+
+  useEffect(() => {
+    const saved = localStorage.getItem(SUBJECT_STORAGE_KEY);
+    if (isSubject(saved)) setSubject(saved);
+  }, []);
+
+  function pickSubject(s: Subject) {
+    setSubject(s);
+    localStorage.setItem(SUBJECT_STORAGE_KEY, s);
+  }
   // All three papers (GS Paper I, PSIR Paper 1/2) are evaluated as analytical
   // answer-writing. The Essay paper is a separate UPSC paper, handled elsewhere.
   const psir = isPsir(subject);
@@ -100,6 +117,9 @@ export default function Home() {
   const [error, setError] = useState("");
 
   const [history, setHistory] = useState<EvalRecord[]>([]);
+  // Filter for the history list + score trend, so PSIR and GS scores aren't
+  // mixed into one meaningless trend line. "all" shows everything.
+  const [historyFilter, setHistoryFilter] = useState<Subject | "all">("all");
   // Whole-history feed the user-wide mistake bank is derived from (wider than
   // the 20-row history window above).
   const [mistakeSources, setMistakeSources] = useState<EvalRecord[]>([]);
@@ -173,6 +193,11 @@ export default function Home() {
       setHistory(await fetchHistory());
     }
   }
+
+  const filteredHistory = useMemo(
+    () => (historyFilter === "all" ? history : history.filter((r) => (r.subject ?? "gs1") === historyFilter)),
+    [history, historyFilter],
+  );
 
   // Notes grouped by page, so each AnswerSheet only gets its own annotations.
   const notesByPage = useMemo(() => {
@@ -304,7 +329,7 @@ export default function Home() {
       const effectiveQuestions =
         questions.length || !topic.trim()
           ? questions
-          : [{ number: "1", text: topic.trim(), marks: null }];
+          : [{ number: "1", text: topic.trim(), marks: topicMarks ? Number(topicMarks) : null }];
 
       // Strip the (large, base64) diagram PNGs out of the page payload — the
       // text/structure path doesn't need them, and they'd bloat the body. The
@@ -361,7 +386,7 @@ export default function Home() {
   if (historyEnabled && !user && !DEV_NO_AUTH) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-5 text-center">
-        <h1 className="text-2xl font-bold">UPSC Mains Essay Evaluator</h1>
+        <h1 className="text-2xl font-bold">UPSC Mains Answer Evaluator</h1>
         <p className="mt-2 text-sm text-neutral-600">
           Sign in to continue. Access is limited to authorized users.
         </p>
@@ -408,7 +433,7 @@ export default function Home() {
           </button>
         </div>
       )}
-      <h1 className="text-2xl font-bold">UPSC Mains Essay Evaluator</h1>
+      <h1 className="text-2xl font-bold">UPSC Mains Answer Evaluator</h1>
       <p className="mt-1 text-sm text-neutral-600">
         Upload the answer-booklet PDF (and optionally the question paper). It transcribes into a
         digital answer-sheet you can correct, then marks it inline like an examiner.
@@ -427,7 +452,7 @@ export default function Home() {
           {SUBJECTS.map((s) => (
             <button
               key={s.key}
-              onClick={() => setSubject(s.key)}
+              onClick={() => pickSubject(s.key)}
               className={`rounded px-4 py-1.5 text-sm font-medium transition ${
                 subject === s.key ? "bg-neutral-900 text-white" : "text-neutral-600 hover:text-neutral-900"
               }`}
@@ -475,18 +500,33 @@ export default function Home() {
 
       {/* Topic fallback when no question paper is uploaded */}
       {questionFiles.length === 0 && (
-        <section className="mt-4">
-          <label className="block text-sm font-semibold">Question (optional)</label>
-          <input
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder={
-              psir
-                ? "e.g. Critically examine Rawls's theory of justice and its communitarian critiques."
-                : "e.g. Evaluate the role of subsidiary alliance in expanding British control in India."
-            }
-            className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
-          />
+        <section className="mt-4 flex gap-3">
+          <div className="min-w-0 flex-1">
+            <label className="block text-sm font-semibold">Question (optional)</label>
+            <input
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder={
+                psir
+                  ? "e.g. Critically examine Rawls's theory of justice and its communitarian critiques."
+                  : "e.g. Evaluate the role of subsidiary alliance in expanding British control in India."
+              }
+              className="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold">Marks</label>
+            <select
+              value={topicMarks}
+              onChange={(e) => setTopicMarks(e.target.value)}
+              className="mt-1 rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm"
+            >
+              <option value="">—</option>
+              <option value="10">10</option>
+              <option value="15">15</option>
+              <option value="20">20</option>
+            </select>
+          </div>
         </section>
       )}
 
@@ -556,6 +596,7 @@ export default function Home() {
               <DemandChecklist
                 key={i}
                 ev={ev}
+                psir={psir}
                 structure={ev.questionNumber ? structureByQ.get(ev.questionNumber) : undefined}
               />
             ))}
@@ -571,9 +612,24 @@ export default function Home() {
             <span className="text-xs text-neutral-500">{history.length} saved</span>
           </div>
 
+          {/* Paper filter — keeps the trend comparable (PSIR vs GS aren't). */}
+          <div className="mt-3 inline-flex rounded-md border border-neutral-300 bg-white p-0.5 text-xs">
+            {([{ key: "all" as const, label: "All" }, ...SUBJECTS]).map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setHistoryFilter(s.key)}
+                className={`rounded px-3 py-1 font-medium transition ${
+                  historyFilter === s.key ? "bg-neutral-900 text-white" : "text-neutral-600 hover:text-neutral-900"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
           {/* Score trend — most recent on the right. */}
           <div className="mt-4 flex items-end gap-1.5" aria-label="Overall score trend">
-            {[...history].reverse().map((r) => (
+            {[...filteredHistory].reverse().map((r) => (
               <div
                 key={r.id}
                 title={`${r.overall_score}/100 — ${new Date(r.created_at).toLocaleDateString()}`}
@@ -584,7 +640,7 @@ export default function Home() {
           </div>
 
           <ul className="mt-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200 bg-white">
-            {history.map((r) => (
+            {filteredHistory.map((r) => (
               <li key={r.id} className="flex items-center hover:bg-neutral-50">
                 <button
                   onClick={() => viewRecord(r)}

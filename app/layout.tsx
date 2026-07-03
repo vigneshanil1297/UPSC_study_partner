@@ -28,8 +28,8 @@ const noteFont = Square_Peg({
 });
 
 export const metadata: Metadata = {
-  title: "UPSC Mains Essay Evaluator",
-  description: "Transcribe handwritten answer PDFs into digital answer-sheets and get inline examiner feedback.",
+  title: "UPSC Mains Answer Evaluator",
+  description: "Transcribe handwritten answer PDFs into digital answer-sheets and get inline examiner feedback — GS and PSIR optional papers.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

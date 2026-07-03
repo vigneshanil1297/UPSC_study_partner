@@ -1,0 +1,16 @@
+{
+  "label": "strong-psir1-berlin-liberty (topper-grade, expect high)",
+  "subject": "psir1",
+  "mode": "gs",
+  "expected": { "minPercent": 55, "maxPercent": 78 },
+  "note": "Dense named-thinker roster, attributed quotes, debate staged across schools (Berlin -> Green/positive -> MacCallum -> Marxist/feminist counters), Indian bridge, synthesising position. Should land in the good-to-topper band under the anchored scale.",
+  "questions": [
+    { "number": "1", "text": "Critically examine Isaiah Berlin's two concepts of liberty.", "marks": 15 }
+  ],
+  "answers": [
+    {
+      "questionNumber": "1",
+      "text": "Liberty is an essentially contested concept in political theory. Isaiah Berlin, in his lecture 'Two Concepts of Liberty' (1958), gave the discipline its most influential typology: negative and positive liberty.\nBerlin's two concepts:\n- Negative liberty is the absence of external interference — 'liberty in this sense is simply the area within which a man can act unobstructed by others'. Its lineage runs through Hobbes, Bentham and J.S. Mill's harm principle.\n- Positive liberty is self-mastery — being one's own master, associated with T.H. Green ('liberty is the positive power of doing and enjoying something worth doing'), Rousseau and Kant.\nBerlin's warning:\n- Berlin defended negative liberty, warning that positive liberty's split between a 'higher' and 'lower' self allows the state to coerce citizens 'for their own good' — the road from Rousseau's general will to totalitarianism.\nCritiques:\n- Gerald MacCallum dissolved the dichotomy: all liberty is one triadic relation — X is free from Y to do Z.\n- Charles Taylor argues Berlin's negative view is an 'opportunity concept' that cannot distinguish trivial from significant freedoms.\n- Marxists hold negative liberty formal and empty without material conditions; C.B. Macpherson recasts liberty as developmental power against 'possessive individualism'.\n- Feminists (Carole Pateman) note non-interference in the private sphere shields patriarchal unfreedom.\n- Amartya Sen's capability approach operationalises the positive view — freedom as real capability, echoed in Article 21's expansion in Maneka Gandhi and in India's welfare architecture.\nThus Berlin's dichotomy remains the grammar of the liberty debate, but the critiques show freedom needs both non-interference and enabling conditions — a synthesis the Indian constitutional practice of negative rights plus directive-principle welfare embodies."
+    }
+  ]
+}

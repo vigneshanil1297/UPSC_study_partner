@@ -1,0 +1,16 @@
+{
+  "label": "strong-psir2-globalisation-sovereignty (topper-grade, expect high)",
+  "subject": "psir2",
+  "mode": "gs",
+  "expected": { "minPercent": 55, "maxPercent": 78 },
+  "note": "IR debate staged across schools (hyperglobalist -> realist/sceptic -> transformationalist), named theorists + quotes, correct IR vocabulary, live examples, defended position on 'do you agree'. Should land in the good-to-topper band.",
+  "questions": [
+    { "number": "1", "text": "Globalisation has eroded the sovereignty of the nation-state. Do you agree? Give reasons.", "marks": 20 }
+  ],
+  "answers": [
+    {
+      "questionNumber": "1",
+      "text": "Sovereignty — supreme authority within a territory, canonised at Westphalia (1648) — faces its sharpest challenge from globalisation, the 'widening, deepening and speeding up of worldwide interconnectedness' (Held & McGrew).\nThe hyperglobalist case — sovereignty eroded:\n- Kenichi Ohmae announces 'the end of the nation state': in a borderless economy, capital, not cabinets, decides.\n- Jan Aart Scholte's supraterritoriality: finance, cyberspace and climate escape territorial jurisdiction altogether — a 'post-sovereign' world.\n- Susan Strange: 'where states were once the masters of markets, now it is the markets which are the masters of states'. IMF conditionalities (Greece 2010; India 1991) and WTO disciplines legislate domestically.\n- Transnational actors — MNCs with turnovers larger than GDPs, NGOs, credit-rating agencies — and human-rights regimes (R2P, ICC) pierce the Westphalian shell.\nThe sceptic/realist counter — sovereignty persists:\n- Hirst and Thompson call hyperglobalism a 'myth': the state remains the gatekeeper; globalisation exists because states permit it.\n- Kenneth Waltz: in anarchy, self-help endures — Brexit, US-China trade war, vaccine nationalism and the Ukraine war show hard borders and hard power returning.\n- Stephen Krasner terms sovereignty 'organised hypocrisy' — always violated, never dissolved.\nThe transformationalist synthesis:\n- Held: sovereignty is not eroded but 'reconstituted' — states now share authority upward (WTO, UNFCCC), sideways (markets) and downward (regions), exercising it through pooled institutions like the EU.\nIndia illustrates the synthesis: it accepted WTO disciplines yet blocked the Doha agri-deal, uses data-localisation and Atmanirbhar Bharat to reassert economic sovereignty, and practises strategic autonomy amid interdependence.\nI therefore agree only partially: globalisation has transformed the manner in which sovereignty is exercised — from absolute control to negotiated authority — but the territorial state remains, as Bull foresaw, the irreplaceable unit of world order."
+    }
+  ]
+}

@@ -20,20 +20,40 @@ export const SUBJECTS: { key: Subject; label: string }[] = [
 
 export const isPsir = (s: Subject): boolean => s === "psir1" || s === "psir2";
 
-// The evaluation dimensions for a UPSC Mains essay. Keep names + descriptions
-// here in one place — they drive both the prompt and the output schema.
+// The evaluation dimensions for GS answers and essays. Keep names +
+// descriptions here in one place — they drive both the prompt and the output
+// schema.
 export const CRITERIA = [
   { key: "factual_accuracy", label: "Factual Accuracy", hint: "Are facts, dates, names, schemes, and data points correct? Flag any that look wrong or fabricated." },
-  { key: "relevance", label: "Relevance to Topic", hint: "Does the essay stay on the demanded theme, or drift into adjacent but unasked areas?" },
+  { key: "relevance", label: "Relevance to Topic", hint: "Does the answer stay on the demanded theme, or drift into adjacent but unasked areas?" },
   { key: "coherence", label: "Coherence", hint: "Do paragraphs connect logically? Are transitions smooth?" },
   { key: "evidence", label: "Anecdotes / Quotes / Data", hint: "Quality and aptness of examples, quotes, case studies, and statistics used as evidence." },
   { key: "structure", label: "Structure", hint: "Introduction hook, body organisation, paragraph balance, overall architecture." },
   { key: "conclusion", label: "Conclusion Quality", hint: "Does it synthesise rather than summarise? Forward-looking, balanced close?" },
   { key: "multidimensional", label: "Multidimensional Coverage", hint: "Coverage across dimensions (social, economic, political, ethical, environmental, historical, international)." },
-  { key: "language", label: "Language & Expression", hint: "Clarity, vocabulary, grammar, sentence variety, tone appropriate for the essay paper." },
+  { key: "language", label: "Language & Expression", hint: "Clarity, vocabulary, grammar, sentence variety, appropriate tone." },
   { key: "balance", label: "Balance", hint: "Are multiple viewpoints fairly represented, or is it one-sided?" },
   { key: "argument_flow", label: "Argument Flow", hint: "Does the central argument build progressively toward the conclusion?" },
 ] as const;
+
+// PSIR (optional paper) dimensions. An optional is graded on command of the
+// DISCIPLINE — thinkers, schools, staged debates — so the axes differ from GS.
+// Mirrors the Shubhra Ranjan marking grid (understanding of the question,
+// structure & flow, subject knowledge, presentation) plus the PSIR playbook.
+export const PSIR_CRITERIA = [
+  { key: "question_understanding", label: "Understanding of the Question", hint: "Did the answer grasp the exact theoretical demand and obey the directive word?" },
+  { key: "thinker_command", label: "Thinker & Concept Command", hint: "Are claims attributed to named thinkers with the right concept and text? Mis-attributing a concept to the wrong thinker is a serious error." },
+  { key: "debate_coverage", label: "Coverage of the Debate", hint: "Does the answer stage the competing schools' positions and counters on the concept, or stay single-school? Marked turns ('However, communitarians…') expected." },
+  { key: "quotes", label: "Quotations", hint: "2-4 short, accurate, attributed thinker quotes deployed to anchor positions — not as filler. An unattributed paraphrase is weaker than a named quoted line." },
+  { key: "structure", label: "Structure & Flow", hint: "Conceptual intro locating the term; dialectical body (thesis → counter → synthesis) under headings; a synthesising, position-taking conclusion." },
+  { key: "contemporary_bridge", label: "Indian / Contemporary Bridge", hint: "Does the answer ground theory in the Indian state or current events where apt (Article 21, Basic Structure, reservation, live IR episodes)?" },
+  { key: "accuracy", label: "Theoretical Accuracy", hint: "Are the schools' positions, concepts, and IR vocabulary used correctly?" },
+  { key: "language", label: "Language & Presentation", hint: "Precise disciplinary vocabulary, underlined key terms/thinkers, clean paragraphing." },
+] as const;
+
+// The dimension list injected into the evaluation prompt for a given paper.
+export const criteriaFor = (subject: Subject): ReadonlyArray<{ label: string; hint: string }> =>
+  isPsir(subject) ? PSIR_CRITERIA : CRITERIA;
 
 export type CriterionKey = (typeof CRITERIA)[number]["key"];
 

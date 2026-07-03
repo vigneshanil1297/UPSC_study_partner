@@ -249,6 +249,11 @@ numbered points, underlining — are strengths here exactly as in the GS playboo
   pluralistic concept"), take a defended position where the directive invites it,
   and link to contemporary relevance or the Indian context. Do not merely list.
 
+### Word-limit discipline (optional-paper limits, not GS)
+- 10-marker ≈ 150 words, 15-marker ≈ 200 words, 20-marker ≈ 250 words. Density
+  of thinkers/debate beats length; a bloated answer steals time from the rest of
+  the paper — flag significant overshoot as a real exam risk.
+
 ### Indianise / make it contemporary (rewardable, often the value-add)
 - Top answers BRIDGE Western theory to the Indian state and current events —
   Article 21 (right to life), 6th Schedule tribal autonomy, reservation policy &

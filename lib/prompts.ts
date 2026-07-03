@@ -1,7 +1,7 @@
-import { CRITERIA, isPsir, type EvalMode, type Question, type StructuredPage, type Subject } from "./criteria";
+import { criteriaFor, isPsir, type EvalMode, type Question, type StructuredPage, type Subject } from "./criteria";
 import { GS1_SYLLABUS, PSIR_PAPER1_SYLLABUS, PSIR_PAPER2_SYLLABUS } from "./syllabus";
 import { TOPPER_PLAYBOOK, ESSAY_LENS, PSIR_PLAYBOOK } from "./knowledge-base";
-import { STRUCTURE_BENCHMARK, structureSummary } from "./structure";
+import { benchmarkFor, structureSummary } from "./structure";
 import { directiveNote } from "./directives";
 import { topicGuidance } from "./topic-templates";
 
@@ -50,8 +50,6 @@ Rules:
 - Include every distinct question, including sub-parts (e.g. 5(a), 5(b)) as separate entries.
 - Reproduce the wording faithfully; do not paraphrase.
 - Ignore instructions, headers, and page furniture that are not questions.`;
-
-const criteriaBlock = CRITERIA.map((c) => `- ${c.label}: ${c.hint}`).join("\n");
 
 // Render the structured pages as indexed plain text the evaluator can anchor
 // notes to. Each line is prefixed [p<page>:l<lineIndex>] so the model can point
@@ -107,12 +105,25 @@ ${ESSAY_LENS}
 </essay_lens>`
       : `You are evaluating GS analytical answers (10- or 15-mark questions, ~150/250 words). Apply the topper playbook in full: clear sub-headings, numbered points, apt diagrams/maps, and directive compliance are STRENGTHS to reward. Flowing essay-style prose with no structure scores poorly in this mode.`;
 
+  const criteriaBlock = criteriaFor(subject)
+    .map((c) => `- ${c.label}: ${c.hint}`)
+    .join("\n");
+  const bench = benchmarkFor(psir);
+
   return `You are an experienced, fair ${examiner} marking a real answer booklet with a red pen.
 
 YOUR EVALUATION PHILOSOPHY (most important):
 - An answer is LARGELY CORRECT if it meets the CORE DEMAND of the question. Judge core demand first.
-- When the core demand is met, do NOT nitpick. Your main job is to suggest just 2-4 concrete ADDITIONAL sentences or points that would give the answer the incremental edge — the extra couple of marks that make the difference. These go in "value_additions" and are the heart of your feedback. Make them specific and ready to use (a named example, a scheme, a data point, a dimension, a sharper conclusion line) — not generic advice like "add more examples".
+- When the core demand is met, do NOT nitpick. Your main job is to suggest just 2-4 concrete ADDITIONAL sentences or points that would give the answer the incremental edge — the extra couple of marks that make the difference. These go in "value_additions" and are the heart of your feedback. Make them specific and ready to use (${psir ? "a missing thinker + their quote, the counter-school skipped, an Indian/contemporary bridge, a sharper synthesising line" : "a named example, a scheme, a data point, a dimension, a sharper conclusion line"}) — not generic advice like "add more examples".
 - Only when the core demand is partial or missed should you be critical about what is fundamentally lacking.
+
+SCORE ANCHORING — award marks the way UPSC actually marks, not like a lenient tutor:
+- ~35-40% of max = weak (off-demand, generic, ${psir ? "thinker-free" : "example-free"}).
+- ~45-50% = average (core demand partly met, some substance, little value-addition).
+- ~55-60% = good (core demand met with specifics — this is already a competitive answer).
+- ~65-70% = topper-grade, rare (complete demand coverage + dense value-addition).
+- Above 70% is exceptional and almost never awarded in ${psir ? "an optional" : "GS"} marking.
+Concretely for a 20-marker: 8 = weak, 10 = average, 12-13 = very good, 14+ = exceptional. For a 15-marker: 6 / 7-8 / 9-10 / 11+. For a 10-marker: 4 / 5 / 6-7 / 7.5+. Do NOT compress everything into the 60-75% band; use the full scale so scores are comparable across tests.
 
 For each answer you also produce:
 - "core_demand_met": "met" | "partial" | "not".
@@ -120,8 +131,12 @@ For each answer you also produce:
 - "score" out of "max_score" (use the question's marks if known, else score out of 10) — reflect that a met core demand already earns most marks.
 - "one_line": a short examiner verdict.
 - "inline_notes": red margin notes ANCHORED to a specific page + lineIndex. Use the [p<page>:l<line>] tags in the answer text to set "page" and "lineIndex". type = "add" (insert value here), "fix" (correction), or "praise" (a genuinely strong line). Keep each note short, in the second person, like a real examiner's margin scribble.
-- "structure_note": one short remark comparing the answer's NUMBER OF POINTS and its INTRO/BODY/CONCLUSION SPATIAL BALANCE to the topper benchmark below, using the per-answer "STRUCTURE" figures given in the user message. Topper benchmark: ~${STRUCTURE_BENCHMARK.pointsPer10} points for a 10-marker and ~${STRUCTURE_BENCHMARK.pointsPer15} for a 15-marker, and a spatial split of roughly ${Math.round(STRUCTURE_BENCHMARK.intro * 100)}% intro / ${Math.round(STRUCTURE_BENCHMARK.body * 100)}% body / ${Math.round(STRUCTURE_BENCHMARK.conclusion * 100)}% conclusion (by page space, not word count). Flag a bloated intro/conclusion, a thin body, or too few points; null if structure data is absent.
-- "diagram_note": one short examiner remark on this answer's DIAGRAM(S). If diagram image(s) for this answer are supplied (see the "CANDIDATE'S DIAGRAMS" manifest — each image is attributed to a question number), LOOK AT THEM and judge: is the figure APT for the demand, is it correctly LABELLED, does it actually add analytical value, or is it decorative/wrong? Reward an apt, labelled diagram. If NO diagram was drawn but one would have markedly helped (a sketch map to locate examples, a cross-section/process figure, a cycle/flow or mind-map — per the playbook), say so and name the diagram that was warranted. Set null only when diagrams are neither present nor expected for this question.
+- "structure_note": one short remark comparing the answer's NUMBER OF POINTS, WORD COUNT vs the question's word limit (${psir ? "150/200/250 words for a 10/15/20-marker" : "150 words for a 10-marker, 250 for a 15-marker"} — flag a significant overshoot or a thin undershoot), and its INTRO/BODY/CONCLUSION SPATIAL BALANCE to the topper benchmark, using the per-answer "STRUCTURE" figures given in the user message. Topper benchmark: ~${bench.pointsPer10} points for a 10-marker, ~${bench.pointsPer15} for a 15-marker, ~${bench.pointsPer20} for a 20-marker, and a spatial split of roughly ${Math.round(bench.intro * 100)}% intro / ${Math.round(bench.body * 100)}% body / ${Math.round(bench.conclusion * 100)}% conclusion (by page space, not word count). Flag a bloated intro/conclusion, a thin body, or too few points; null if structure data is absent.
+- "diagram_note": ${
+    psir
+      ? `PSIR is graded on thinkers and debates, NOT on diagrams — NEVER advise adding a diagram or penalise its absence. If the candidate drew one, briefly judge whether it genuinely aids the argument (a clean school-comparison table can); otherwise set null.`
+      : `one short examiner remark on this answer's DIAGRAM(S). If diagram image(s) for this answer are supplied (see the "CANDIDATE'S DIAGRAMS" manifest — each image is attributed to a question number), LOOK AT THEM and judge: is the figure APT for the demand, is it correctly LABELLED, does it actually add analytical value, or is it decorative/wrong? Reward an apt, labelled diagram. If NO diagram was drawn but one would have markedly helped (a sketch map to locate examples, a cross-section/process figure, a cycle/flow or mind-map — per the playbook), say so and name the diagram that was warranted. Set null only when diagrams are neither present nor expected for this question.`
+  }
 
 Reference standard — evaluate against top-ranking candidates, using:
 Dimensions to weigh:
@@ -185,7 +200,7 @@ export function evaluationUser(
   }
   const structureBlock = [...byQ.entries()]
     .map(([q, pgs]) => {
-      const s = structureSummary(pgs);
+      const s = structureSummary(pgs, isPsir(subject));
       return s ? `Q${q}: ${s}` : "";
     })
     .filter(Boolean)

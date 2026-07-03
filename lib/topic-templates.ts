@@ -24,8 +24,9 @@ export type TopicTemplate = {
   dimensions: string[];
 };
 
-// GS1's 13 official syllabus areas. PSIR is left to its own playbook for now;
-// an unmatched subject simply yields no template (graceful fallback).
+// GS1's 13 official syllabus areas, plus templates for both PSIR papers keyed
+// to the syllabus sections. An unmatched question yields no template (graceful
+// fallback).
 const TEMPLATES: TopicTemplate[] = [
   {
     subject: "gs1",
@@ -157,6 +158,133 @@ const TEMPLATES: TopicTemplate[] = [
       "distribution / why it occurs where it does",
       "impacts (both destructive and, where asked, beneficial)",
       "mitigation tied to a framework (Sendai, NDMA) and a named event",
+    ],
+  },
+
+  // ------------------------- PSIR Paper I -------------------------
+  {
+    subject: "psir1",
+    area: "PSIR1.A Core concepts of political theory (justice, equality, rights, liberty, democracy, power)",
+    keywords: ["justice", "equality", "rights", "liberty", "freedom", "democracy", "power", "hegemony", "legitimacy", "citizenship", "affirmative", "rawls", "nozick", "berlin", "deliberative", "participatory", "representative"],
+    dimensions: [
+      "open by locating the concept (contested/architectonic/normative) and the thinker who anchors the modern debate",
+      "march the concept through the competing schools — liberal → libertarian → communitarian → Marxist → feminist → multiculturalist → post-modern — each position attributed to a named thinker with the counter marked",
+      "2-4 short attributed quotes anchoring key positions",
+      "bridge to the Indian constitutional/contemporary context (Article 21, reservation, Basic Structure, a live episode)",
+      "synthesising conclusion that takes a defended position, not a summary",
+    ],
+  },
+  {
+    subject: "psir1",
+    area: "PSIR1.A Theories of state & political ideologies",
+    keywords: ["state", "ideology", "liberalism", "socialism", "marxism", "fascism", "gandhism", "feminism", "pluralist", "neoliberal", "postcolonial", "anarchism", "welfare"],
+    dimensions: [
+      "define the theory/ideology's core claims via its canonical thinkers and texts",
+      "contrast it with the rival theories of the state, marking each turn",
+      "internal variants and evolution (classical vs contemporary strands)",
+      "critiques from other schools + the ideology's continuing relevance, with an Indian illustration where apt",
+    ],
+  },
+  {
+    subject: "psir1",
+    area: "PSIR1.A Western political thought (Plato → Arendt)",
+    keywords: ["plato", "aristotle", "machiavelli", "hobbes", "locke", "rousseau", "mill", "marx", "gramsci", "arendt", "thinker", "philosopher", "kant", "bentham", "hegel"],
+    dimensions: [
+      "locate the thinker in their historical context and the problem they answered",
+      "core concepts with the texts they come from, accurately attributed",
+      "major critiques and who made them",
+      "comparison/dialogue with other thinkers on the same question",
+      "contemporary relevance of the idea",
+    ],
+  },
+  {
+    subject: "psir1",
+    area: "PSIR1.A Indian political thought (Dharamshastra → M.N. Roy)",
+    keywords: ["kautilya", "arthashastra", "dharamshastra", "buddhist", "gandhi", "ambedkar", "aurobindo", "roy", "syed", "vivekananda", "tagore", "swaraj", "sarvodaya", "humanism"],
+    dimensions: [
+      "the thinker's key concepts with their texts/speeches, accurately attributed",
+      "the Western frame or contemporaries they engage (Gandhi–Ambedkar, Roy vs orthodox Marxism, Aurobindo vs liberal nationalism)",
+      "evolution of the thinker's position over time where relevant",
+      "contemporary application of the idea in Indian politics",
+    ],
+  },
+  {
+    subject: "psir1",
+    area: "PSIR1.B Indian nationalism & perspectives on the national movement",
+    keywords: ["nationalism", "freedom", "satyagraha", "noncooperation", "civil", "disobedience", "revolutionary", "peasant", "perspectives", "movement", "constitutionalism"],
+    dimensions: [
+      "the phase/strategy with dates and named episodes",
+      "perspective-wise treatment — Liberal, Socialist, Marxist, Radical Humanist, Dalit — each with its named scholars/proponents",
+      "debates between strategies (moderates vs extremists, Gandhi vs revolutionaries)",
+      "assessment: what each perspective illuminates and misses",
+    ],
+  },
+  {
+    subject: "psir1",
+    area: "PSIR1.B Constitution, Union organs, federalism & institutions",
+    keywords: ["constitution", "preamble", "parliament", "judiciary", "judicial", "supreme", "court", "president", "governor", "federalism", "centre", "basic", "structure", "amendment", "commission", "panchayati", "grassroots", "election"],
+    dimensions: [
+      "the constitutional provisions and their intent (envisaged role)",
+      "actual working with named cases, episodes, and commissions",
+      "scholarly framing (Granville Austin, Morris-Jones, K.C. Wheare's 'quasi-federal', Rajni Kothari)",
+      "current debates/reform proposals and a balanced judgement",
+    ],
+  },
+  {
+    subject: "psir1",
+    area: "PSIR1.B Parties, caste, elections & social movements",
+    keywords: ["party", "parties", "coalition", "caste", "religion", "ethnicity", "electoral", "voting", "pressure", "groups", "movements", "civil", "women", "environmental"],
+    dimensions: [
+      "the empirical trend with named parties/movements/elections",
+      "scholarly interpretation (Rajni Kothari's 'Congress system', Yogendra Yadav's 'democratic upsurge', Kanchan Chandra on ethnic parties)",
+      "social bases and changing profile over time",
+      "significance for Indian democracy, judged both ways",
+    ],
+  },
+
+  // ------------------------- PSIR Paper II -------------------------
+  {
+    subject: "psir2",
+    area: "PSIR2.A Comparative politics: approaches & the state in comparative perspective",
+    keywords: ["comparative", "approaches", "political", "economy", "sociology", "systems", "structural", "functionalism", "capitalist", "socialist", "developing", "advanced", "industrial", "representation", "participation"],
+    dimensions: [
+      "the approach's core claims with named theorists (Easton's systems theory, Almond & Powell, political sociology — Béteille/Kothari/Yadav)",
+      "its limitations and the critique (Hedley Bull's 'model-building exercise'; ethnocentrism of the comparative method)",
+      "application across state types (capitalist/socialist, advanced/developing) with named country examples",
+      "a judged position on the approach's continuing utility",
+    ],
+  },
+  {
+    subject: "psir2",
+    area: "PSIR2.A IR theory (realism, liberalism, Marxism, constructivism, feminism, post-modernism)",
+    keywords: ["realism", "neorealism", "morgenthau", "waltz", "liberalism", "neoliberalism", "keohane", "nye", "constructivism", "wendt", "wallerstein", "dependency", "feminist", "tickner", "postmodern", "idealist", "theory", "anarchy"],
+    dimensions: [
+      "define the school via its canonical thinkers and signature concepts (animus dominandi, security dilemma, complex interdependence, 'anarchy is what states make of it')",
+      "stage the inter-school debate: each rival's counter-position, attributed and marked",
+      "correct IR vocabulary (national interest, balance of power, deterrence, security dilemma, soft/hard power)",
+      "apply to a live episode (Ukraine, Indo-Pacific, climate regime) to ground the theory",
+    ],
+  },
+  {
+    subject: "psir2",
+    area: "PSIR2.A Global order: UN, globalisation, regionalisation, contemporary concerns",
+    keywords: ["united", "nations", "unsc", "globalisation", "globalization", "regionalisation", "asean", "european", "union", "wto", "bretton", "nieo", "cold", "war", "unipolarity", "multipolarity", "terrorism", "proliferation", "environment", "human", "rights"],
+    dimensions: [
+      "envisaged role vs actual record, with named episodes/agencies",
+      "theoretical framing (which school explains the institution/trend best)",
+      "developed vs developing world responses — the Global South angle",
+      "reform debates and India's stake, ending with a judged position",
+    ],
+  },
+  {
+    subject: "psir2",
+    area: "PSIR2.B Indian foreign policy & India and the world",
+    keywords: ["india", "foreign", "policy", "nam", "nonalignment", "saarc", "neighbourhood", "china", "pakistan", "usa", "russia", "nuclear", "doctrine", "act", "east", "indo", "pacific", "quad", "peacekeeping", "africa", "multialignment"],
+    dimensions: [
+      "determinants/continuity-and-change frame (Nehruvian idealism → strategic autonomy → multialignment) with named phases",
+      "concrete policy specifics: named agreements, doctrines, summits, disputes (Indo-US nuclear deal, Act East, no-first-use)",
+      "scholarly/officials' framing (C. Raja Mohan, S. Jaishankar's 'multialignment', Nehru's 'rightful place in the comity of nations')",
+      "assessment against national interest + the institutional angle (PMO, MEA, Parliament) where asked",
     ],
   },
 ];

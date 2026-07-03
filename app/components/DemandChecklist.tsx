@@ -1,7 +1,7 @@
 "use client";
 
 import type { AnswerEvaluation } from "@/lib/criteria";
-import { STRUCTURE_BENCHMARK, type StructureStats } from "@/lib/structure";
+import { benchmarkFor, wordLimit, type StructureStats } from "@/lib/structure";
 
 const coreLabel: Record<AnswerEvaluation["core_demand_met"], { text: string; cls: string }> = {
   met: { text: "Core demand met", cls: "bg-emerald-100 text-emerald-800" },
@@ -36,13 +36,20 @@ function RatioBar({ intro, body, conclusion }: { intro: number; body: number; co
 export default function DemandChecklist({
   ev,
   structure,
+  psir = false,
 }: {
   ev: AnswerEvaluation;
   structure?: StructureStats;
+  psir?: boolean;
 }) {
   const core = coreLabel[ev.core_demand_met];
-  const b = STRUCTURE_BENCHMARK;
-  const targetPoints = ev.max_score >= 15 ? b.pointsPer15 : b.pointsPer10;
+  const b = benchmarkFor(psir);
+  const targetPoints =
+    ev.max_score >= 20 ? b.pointsPer20 : ev.max_score >= 15 ? b.pointsPer15 : b.pointsPer10;
+  const markerLabel = ev.max_score >= 20 ? "20" : ev.max_score >= 15 ? "15" : "10";
+  const limit = wordLimit(ev.max_score, psir);
+  const overLimit = limit && structure ? structure.words > limit * 1.15 : false;
+  const underLimit = limit && structure ? structure.words < limit * 0.6 : false;
   const showStructure = structure && structure.intro + structure.body + structure.conclusion > 0;
   return (
     <div className="mt-3 rounded-lg border border-neutral-200 bg-white p-4">
@@ -83,7 +90,17 @@ export default function DemandChecklist({
             <div className="mt-2 space-y-2">
               <p className="text-sm text-neutral-700">
                 <span className="font-medium">{structure.points} points</span> — topper avg ~{targetPoints} for a{" "}
-                {ev.max_score >= 15 ? "15" : "10"}-marker.
+                {markerLabel}-marker.
+                {structure.words > 0 && limit && (
+                  <>
+                    {" "}
+                    <span className={`font-medium ${overLimit || underLimit ? "text-red-600" : ""}`}>
+                      ~{structure.words} words
+                    </span>{" "}
+                    vs ~{limit} limit
+                    {overLimit ? " — over, trim it" : underLimit ? " — thin, likely under-developed" : ""}.
+                  </>
+                )}
               </p>
               <div>
                 <div className="mb-0.5 flex justify-between text-[11px] text-neutral-500">

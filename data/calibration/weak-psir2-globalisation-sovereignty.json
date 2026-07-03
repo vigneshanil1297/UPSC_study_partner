@@ -1,0 +1,16 @@
+{
+  "label": "weak-psir2-globalisation-sovereignty (theory-free, expect low)",
+  "subject": "psir2",
+  "mode": "gs",
+  "expected": { "minPercent": 15, "maxPercent": 45 },
+  "note": "Same question, deliberately weak: no IR schools or theorists, no quotes, GS-style generalities, one-sided, no defended position on 'do you agree'. Should land clearly below the strong fixture.",
+  "questions": [
+    { "number": "1", "text": "Globalisation has eroded the sovereignty of the nation-state. Do you agree? Give reasons.", "marks": 20 }
+  ],
+  "answers": [
+    {
+      "questionNumber": "1",
+      "text": "Globalisation means the increasing connection between countries in trade, culture and technology. It has grown a lot since the 1990s because of the internet and liberalisation.\nEffects on sovereignty:\n- Countries now depend on each other for trade, so they cannot take decisions fully on their own.\n- Multinational companies operate in many countries and influence governments.\n- International organisations make rules that countries have to follow.\n- Social media spreads ideas across borders and governments cannot control it.\n- Global problems like climate change need global solutions, so countries have to cooperate.\nBecause of all this, the power of the nation-state has reduced. Governments have to think about foreign investors and international opinion before making policies. Culture is also becoming similar everywhere, with people watching the same movies and eating the same food, which affects national identity.\nHowever, states still have armies and make their own laws, so some power remains with them.\nIn conclusion, globalisation has definitely affected the sovereignty of nation-states in many ways. Countries are now interconnected and interdependent. The world has become a global village and this trend will continue in the future."
+    }
+  ]
+}
